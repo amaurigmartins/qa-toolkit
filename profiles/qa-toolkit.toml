@@ -8,7 +8,49 @@ tools = [
   "julia-1.12.6", "juliaformatter", "aqua", "explicitimports",
 ]
 configurations = []
-gates = []
 hooks = []
 skills = []
 
+[[gates]]
+id = "python-format"
+phase = "check"
+argv = ["{tool:ruff}", "format", "--check", "src", "tests"]
+triggers = ["**"]
+timeout = 120
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "python-lint"
+phase = "check"
+argv = ["{tool:ruff}", "check", "src", "tests"]
+triggers = ["**"]
+timeout = 120
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "python-types"
+phase = "check"
+argv = ["{tool:mypy}"]
+triggers = ["**"]
+timeout = 180
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "python-tests"
+phase = "sentinel"
+argv = ["{tool:pytest}", "-p", "no:cacheprovider", "tests"]
+triggers = ["**"]
+timeout = 600
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2, 3, 4, 5]

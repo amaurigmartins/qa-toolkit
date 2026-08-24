@@ -52,6 +52,17 @@ def _positive_integer(value: object, context: str) -> int:
     return value
 
 
+def _exit_codes(value: object, context: str) -> tuple[int, ...]:
+    if not isinstance(value, list) or not all(
+        isinstance(item, int) and not isinstance(item, bool) and item > 0 for item in value
+    ):
+        raise ConfigurationError(f"{context}: expected positive integer exit codes")
+    result = tuple(value)
+    if len(result) != len(set(result)):
+        raise ConfigurationError(f"{context}: duplicate exit code")
+    return result
+
+
 @overload
 def _gate(raw: dict[str, Any], context: str, *, consumer: Literal[True]) -> ConsumerGate: ...
 
@@ -63,7 +74,17 @@ def _gate(raw: dict[str, Any], context: str, *, consumer: Literal[False]) -> Gat
 def _gate(raw: dict[str, Any], context: str, *, consumer: bool) -> Gate | ConsumerGate:
     closed_keys(
         raw,
-        {"id", "phase", "argv", "triggers", "timeout", "severity", "variants"},
+        {
+            "id",
+            "phase",
+            "argv",
+            "triggers",
+            "timeout",
+            "severity",
+            "variants",
+            "finding_exit_codes",
+            "execution_error_exit_codes",
+        },
         context,
     )
     phase = string(raw, "phase", context)
@@ -77,9 +98,36 @@ def _gate(raw: dict[str, Any], context: str, *, consumer: bool) -> Gate | Consum
     triggers = string_list(raw.get("triggers"), f"{context}.triggers")
     timeout = _positive_integer(raw.get("timeout"), f"{context}.timeout")
     variants = string_list(raw.get("variants"), f"{context}.variants")
+    finding_exits = _exit_codes(raw.get("finding_exit_codes"), f"{context}.finding_exit_codes")
+    error_exits = _exit_codes(
+        raw.get("execution_error_exit_codes"), f"{context}.execution_error_exit_codes"
+    )
+    overlap = set(finding_exits) & set(error_exits)
+    if overlap:
+        raise ConfigurationError(f"{context}: exit classifications overlap")
     if consumer:
-        return ConsumerGate(identifier, phase, argv, triggers, timeout, severity, variants)
-    return Gate(identifier, phase, argv, triggers, timeout, severity, variants)
+        return ConsumerGate(
+            identifier,
+            phase,
+            argv,
+            triggers,
+            timeout,
+            severity,
+            variants,
+            finding_exits,
+            error_exits,
+        )
+    return Gate(
+        identifier,
+        phase,
+        argv,
+        triggers,
+        timeout,
+        severity,
+        variants,
+        finding_exits,
+        error_exits,
+    )
 
 
 def load_profile(name: str, root: Path | None = None) -> Profile:

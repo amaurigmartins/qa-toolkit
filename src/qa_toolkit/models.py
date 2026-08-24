@@ -62,6 +62,8 @@ class Gate:
     timeout: int
     severity: str
     variants: tuple[str, ...]
+    finding_exit_codes: tuple[int, ...]
+    execution_error_exit_codes: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -97,6 +99,8 @@ class ConsumerGate:
     timeout: int
     severity: str
     variants: tuple[str, ...]
+    finding_exit_codes: tuple[int, ...]
+    execution_error_exit_codes: tuple[int, ...]
 
 
 @dataclass(frozen=True)
