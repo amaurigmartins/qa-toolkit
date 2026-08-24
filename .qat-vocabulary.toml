@@ -4,6 +4,7 @@ schema_version = 1
 accepted = [
   "Cocogitto",
   "docstrings",
+  "enroll",
   "enrollment",
   "evidentiary",
   "Gridform",
@@ -14,7 +15,9 @@ accepted = [
   "Prek",
   "Pydoclint",
   "Pylint",
+  "pyproject",
   "tbhb",
+  "unenroll",
   "unenrollment",
   "Unslopifier",
   "worktree",
