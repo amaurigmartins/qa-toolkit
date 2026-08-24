@@ -241,7 +241,8 @@ locale = "en-GB"
 accepted = [
   "API", "ASCII", "CLI", "Codex", "CSV", "Documenter", "DSL", "Git", "GitHub", "HTTP",
   "HTTPS", "JSON", "Julia", "LaTeX", "Linux", "Markdown", "pgTAP", "POSIX", "Python",
-  "Ruff", "SQL", "SSH", "TOML", "TTY", "UUID", "Vale", "XML", "YAML",
+  "Ruff", "SQL", "SSH", "TOML", "TTY", "UUID", "Vale", "XML", "YAML", "argparse",
+  "frozenset", "shutil", "subparser", "subparsers", "tomllib", "weakref",
 ]
 hedges = [
   "arguably", "generally", "in many cases", "it may be", "often", "perhaps", "potentially",

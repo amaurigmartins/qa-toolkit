@@ -97,6 +97,8 @@ class CorpusTests(unittest.TestCase):
             self.assertIn("Gridform", resolved["accepted"])
             self.assertIn("RLS", resolved["acronyms"])
             self.assertIn("form_entry", resolved["roles"]["concept"])
+            self.assertIn("form", resolved["accepted"])
+            self.assertIn("entry", resolved["accepted"])
             self.assertTrue((destination / "vale/styles/ai-tells").is_symlink())
             self.assertTrue((destination / "vale/styles/ai-tells").resolve().is_dir())
             self.assertTrue(

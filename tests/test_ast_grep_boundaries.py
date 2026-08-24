@@ -110,6 +110,31 @@ class AstGrepBoundaryTests(unittest.TestCase):
             ):
                 ast_grep._consumer_rules(target, ("one.yml",), root)
 
+    def test_consumer_rule_file_may_contain_multiple_yaml_documents(self) -> None:
+        source = (
+            "id: first-rule\nrule:\n  pattern: print($A)\n"
+            "---\n"
+            "id: second-rule\nrule:\n  pattern: exit($A)\n"
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            target = Path(raw) / "target"
+            root = Path(raw) / "root"
+            target.mkdir()
+            root.mkdir()
+            (target / "rules.yml").write_text(source, encoding="utf-8")
+            with patch("qa_toolkit.ast_grep._managed_rules", return_value={}):
+                rules, inputs = ast_grep._consumer_rules(target, ("rules.yml",), root)
+            self.assertEqual(tuple(rules), ("first-rule", "second-rule"))
+            self.assertEqual(len(inputs), 1)
+
+            duplicate = source.replace("second-rule", "first-rule")
+            (target / "rules.yml").write_text(duplicate, encoding="utf-8")
+            with (
+                patch("qa_toolkit.ast_grep._managed_rules", return_value={}),
+                self.assertRaisesRegex(ast_grep.AstGrepPolicyError, "duplicate consumer"),
+            ):
+                ast_grep._consumer_rules(target, ("rules.yml",), root)
+
     def test_yaml_subset_rejects_ambiguous_rules_and_cases(self) -> None:
         directory_cases = (
             ("ruleDirs:\n", "non-empty"),

@@ -104,17 +104,21 @@ def _consumer_rules(
     inputs: list[tuple[str, str]] = []
     for relative in rule_files:
         text = _read(target, relative)
-        rule_id, body = _rule(text, relative)
-        if rule_id in consumer:
-            raise AstGrepPolicyError(f"duplicate consumer ast-grep rule id: {rule_id}")
-        body_digest = _content_digest(body)
-        if rule_id in managed:
-            raise AstGrepPolicyError(f"consumer ast-grep rule copies managed rule id: {rule_id}")
-        if body_digest in managed.values():
-            raise AstGrepPolicyError(
-                f"consumer ast-grep rule copies a managed rule body: {rule_id}"
-            )
-        consumer[rule_id] = (relative, body_digest)
+        for index, document in enumerate(_yaml_documents(text), start=1):
+            source = f"{relative} document {index}"
+            rule_id, body = _rule(document, source)
+            if rule_id in consumer:
+                raise AstGrepPolicyError(f"duplicate consumer ast-grep rule id: {rule_id}")
+            body_digest = _content_digest(body)
+            if rule_id in managed:
+                raise AstGrepPolicyError(
+                    f"consumer ast-grep rule copies managed rule id: {rule_id}"
+                )
+            if body_digest in managed.values():
+                raise AstGrepPolicyError(
+                    f"consumer ast-grep rule copies a managed rule body: {rule_id}"
+                )
+            consumer[rule_id] = (relative, body_digest)
         inputs.append((relative, _content_digest(text)))
     return consumer, tuple(inputs)
 
@@ -162,6 +166,7 @@ def _consumer_gates(policy: tuple[str, str]) -> tuple[Gate, ...]:
                 config,
                 "--test-dir",
                 tests,
+                "--skip-snapshot-tests",
                 "--color",
                 "never",
             ),
@@ -309,6 +314,21 @@ def _safe_path(value: str) -> bool:
     )
 
 
+def _yaml_documents(text: str) -> tuple[str, ...]:
+    """Split an ast-grep rule stream at explicit top-level document markers."""
+    documents: list[list[str]] = [[]]
+    for line in text.splitlines():
+        if re.fullmatch(r"---[ \t]*(?:#.*)?", line):
+            if not any(item.strip() for item in documents[-1]):
+                raise AstGrepPolicyError("consumer ast-grep rule stream contains an empty document")
+            documents.append([])
+            continue
+        documents[-1].append(line)
+    if not any(item.strip() for item in documents[-1]):
+        raise AstGrepPolicyError("consumer ast-grep rule stream contains an empty document")
+    return tuple("\n".join(document) for document in documents)
+
+
 def _managed_rules(root: Path) -> dict[str, str]:
     managed: dict[str, str] = {}
     rules_root = root / "config" / "ast-grep"
@@ -316,8 +336,11 @@ def _managed_rules(root: Path) -> dict[str, str]:
         if "/rules/" not in str(resource).replace("\\", "/"):
             continue
         text = resource.read_text(encoding="utf-8")
-        rule_id, body = _rule(text, str(resource))
-        managed[rule_id] = _content_digest(body)
+        for index, document in enumerate(_yaml_documents(text), start=1):
+            rule_id, body = _rule(document, f"{resource} document {index}")
+            if rule_id in managed:
+                raise AstGrepPolicyError(f"duplicate managed ast-grep rule id: {rule_id}")
+            managed[rule_id] = _content_digest(body)
     return managed
 
 

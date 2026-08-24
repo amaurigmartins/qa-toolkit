@@ -76,6 +76,7 @@ class ConsumerVocabulary:
     allowances: tuple[dict[str, object], ...]
     locale: str | None
     source_additions: dict[str, tuple[str, ...]]
+    literal_allowances: tuple[str, ...] = ()
 
 
 def _load_toml(path: Path) -> dict[str, Any]:
@@ -244,6 +245,40 @@ def load_consumer_vocabulary(target: Path) -> ConsumerVocabulary:
         )
     path = target / consumer.vocabulary_file
     value = _load_toml(path)
+    if value.get("schema_version") == 3:
+        # The semantic loader imports the shared corpus and must be resolved after module loading.
+        from qa_toolkit.vocabulary import VocabularyError, load_vocabulary  # noqa: PLC0415
+
+        try:
+            policy = load_vocabulary(path, target=target)
+        except VocabularyError as error:
+            raise CorpusError(str(error)) from error
+        shared_forms = {
+            _normalized(form)
+            for rule in load_corpus().terms
+            if rule.prose != "off"
+            for form in rule.forms
+        }
+        accepted = tuple(
+            dict.fromkeys(
+                (
+                    *(term for term in policy.accepted if _normalized(term) not in shared_forms),
+                    *consumer.vocabulary_additions,
+                    *consumer.vocabulary_allowances,
+                )
+            )
+        )
+        return ConsumerVocabulary(
+            accepted=accepted,
+            rejected=policy.rejected,
+            replacements=policy.replacements,
+            acronyms=(),
+            roles={key: tuple(sorted(values)) for key, values in policy.roles.items()},
+            allowances=(),
+            locale="en-US",
+            source_additions={},
+            literal_allowances=policy.accepted,
+        )
     closed_keys(
         value,
         {"schema_version", "terminology", "acronyms", "roles", "allowances", "settings", "sources"},
@@ -351,7 +386,12 @@ def _resolved(corpus: Corpus, consumer: ConsumerVocabulary) -> dict[str, object]
             continue
         for form in rule.forms:
             shared[_normalized(form)] = (form, rule.prose)
-    forbidden_acceptance = sorted(term for term in consumer.accepted if _normalized(term) in shared)
+    literal_allowances = {_normalized(term) for term in consumer.literal_allowances}
+    forbidden_acceptance = sorted(
+        term
+        for term in consumer.accepted
+        if _normalized(term) in shared and _normalized(term) not in literal_allowances
+    )
     if forbidden_acceptance:
         raise CorpusError(
             "consumer accepted terms cannot disable shared rules: "
@@ -385,11 +425,15 @@ def _resolved(corpus: Corpus, consumer: ConsumerVocabulary) -> dict[str, object]
         | set(consumer.replacements.values())
     )
     roles = {key: sorted(set(values)) for key, values in corpus.roles.items()}
-    for key, values in consumer.roles.items():
-        roles[key] = sorted(set(roles.get(key, [])) | set(values))
+    for key, consumer_values in consumer.roles.items():
+        roles[key] = sorted(set(roles.get(key, [])) | set(consumer_values))
+    for role_values in roles.values():
+        accepted.update(role_values)
+        for value in role_values:
+            accepted.update(value.split("_"))
     sources = {key: sorted(set(values)) for key, values in corpus.sources.items()}
-    for key, values in consumer.source_additions.items():
-        sources[key] = sorted(set(sources.get(key, [])) | set(values))
+    for key, additions in consumer.source_additions.items():
+        sources[key] = sorted(set(sources.get(key, [])) | set(additions))
     return {
         "locale": consumer.locale or corpus.locale,
         "shared_errors": sorted(shared_errors),
@@ -422,6 +466,7 @@ def _resolved(corpus: Corpus, consumer: ConsumerVocabulary) -> dict[str, object]
         ],
         "acronyms": sorted(set(corpus.acronyms) | set(consumer.acronyms)),
         "allowances": list(consumer.allowances),
+        "literal_allowances": list(consumer.literal_allowances),
         "sources": sources,
         "documents": corpus.documents,
     }
