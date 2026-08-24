@@ -35,6 +35,26 @@ _PROSE_SUFFIXES = frozenset({".jl", ".markdown", ".md", ".py", ".tex"})
 _SPELLING_SUFFIXES = _PROSE_SUFFIXES
 _LICENSE_NAMES = frozenset({"copying", "license", "notice"})
 _DIRECTIVE = re.compile(r"(?i)(?:<!--|#=?|%)\s*vale\s+(?:off|on|[a-z][a-z0-9_.-]*\s*=)")
+_LITERAL_CHECKS = frozenset(
+    {
+        "OwnedTerms.Forbidden",
+        "OwnedTerms.Questionable",
+        "RepositoryTerms.Forbidden",
+        "STECode.AmericanSpelling",
+        "STECode.BritishSpelling",
+        "STECode.Contractions",
+        "STECode.ForbiddenConnectors",
+        "STECode.InflatedProse",
+        "STECode.InformalTerms",
+        "STECode.NominalizedActions",
+        "STECode.PhrasalVerbs",
+        "STECode.PreferredTerms",
+        "STECode.SafetyLabels",
+        "STECode.SoftwareTerminology",
+        "STECode.UnapprovedComparatives",
+        "STECode.WeakHedges",
+    }
+)
 
 
 class TextToolError(RuntimeError):
@@ -271,6 +291,12 @@ def _matches(path: str, pattern: str) -> bool:
 
 
 def _allowance(alert: _Alert, resolved: dict[str, Any]) -> bool:
+    literal_allowances = resolved.get("literal_allowances", [])
+    if alert.check in _LITERAL_CHECKS and any(
+        isinstance(item, str) and item.casefold() == alert.match.casefold()
+        for item in literal_allowances
+    ):
+        return True
     allowances = resolved.get("allowances", [])
     return any(
         isinstance(item, dict)

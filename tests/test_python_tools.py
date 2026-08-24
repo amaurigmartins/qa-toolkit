@@ -78,6 +78,7 @@ class PythonToolAcceptanceTests(unittest.TestCase):
             [gate.identifier for gate in ast.gates],
             ["consumer-ast-grep-tests", "consumer-ast-grep-scan"],
         )
+        self.assertIn("--skip-snapshot-tests", ast.gates[0].argv)
         self.assertEqual(ast.rule_ids, ("consumer-no-print",))
 
         plan = resolve_plan(

@@ -140,7 +140,7 @@ execution_error_exit_codes = [2]
 [[gates]]
 id = "python-types"
 phase = "check"
-argv = ["{tool:mypy}", "--cache-dir", ".git/qat/cache/mypy", "--config-file", "{python-config:mypy}", "--python-executable", "{target-python}", "{python-paths:ruff}"]
+argv = ["{tool:mypy}", "--cache-dir", ".git/qat/cache/mypy", "--config-file", "{python-config:mypy}", "--python-executable", "{qat-python}", "{python-paths:ruff}"]
 triggers = ["**"]
 timeout = 300
 severity = "blocking"

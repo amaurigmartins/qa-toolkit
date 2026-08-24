@@ -55,6 +55,11 @@ Enrollment creates ignored `.qat/` links, an exact ownership record under `.git/
 repository-local skills, and repository-local Git and Codex dispatchers. Review and trust the exact
 `.codex/hooks.json` through Codex `/hooks`. The toolkit never grants that trust.
 
+A declared vocabulary file may use schema 1 for terminology, roles, acronyms, and bounded
+allowances. Schema 3 additionally defines callable grammars, path-specific role ownership,
+identifier replacements, and accepted and rejected examples. The runner validates that policy,
+generates the shared text inputs from it, and adds one semantic Python gate.
+
 ## Run quality gates
 
 ```console

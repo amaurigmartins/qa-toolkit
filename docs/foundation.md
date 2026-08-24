@@ -56,6 +56,11 @@ Unknown fields, unsafe paths, weaker Python settings, copied central rules, and 
 a centrally owned tool fail validation. Import Linter runs only when the selected Python project
 contains tracked non-empty direction rules.
 
+Vocabulary schema 1 covers terminology, roles, acronyms, and bounded allowances. Vocabulary schema
+3 adds callable grammars, path-specific role ownership, identifier replacement, and required
+accepted and rejected examples. One central semantic gate evaluates the schema-3 policy. The
+consumer does not add a separate scanner command.
+
 Enrollment exposes every executable selected by the profile through recorded symlinks below
 `.qat/bin`. Names remain unchanged unless two selected runtimes provide the same executable. Those
 aliases use the tool IDs. Consumer gates may name one same-phase gate with `before` when an opaque

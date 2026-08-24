@@ -30,6 +30,7 @@ from qa_toolkit.python_tools import (
     resolve_python,
 )
 from qa_toolkit.registry import executable_path, select_tools
+from qa_toolkit.vocabulary import VocabularyError, resolve_vocabulary
 
 NormalizedResult = Literal["pass", "finding", "execution-error", "not-run"]
 
@@ -264,6 +265,7 @@ def _resolve_plan(
     target_python = _target_python(target, consumer.python.project, root)
     python = resolve_python(target, root, consumer) if "ruff" in profile.tools else None
     ast_grep = resolve_ast_grep(consumer, target=target, root=root)
+    vocabulary = resolve_vocabulary(consumer, target=target, root=root)
     selected_bins = tuple(
         dict.fromkeys(
             str(executable_path(tool, root).parent) for tool in select_tools(profile.tools, root)
@@ -284,7 +286,7 @@ def _resolve_plan(
     selected: list[PlannedGate] = []
     seen: set[str] = set()
     for phase in phases:
-        dynamic = (() if python is None else python.gates) + ast_grep.gates
+        dynamic = (() if python is None else python.gates) + ast_grep.gates + vocabulary.gates
         sources: tuple[tuple[Gate | ConsumerGate, str, Path], ...] = (
             tuple(
                 (gate, "central", profile.source) for gate in profile.gates if gate.phase == phase
@@ -325,6 +327,8 @@ def _resolve_plan(
         digests["corpus"] = corpus_digest
     if ast_grep.digest is not None:
         digests["consumer-ast-grep"] = ast_grep.digest
+    if vocabulary.digest is not None:
+        digests["semantic-vocabulary"] = vocabulary.digest
     return ResolvedPlan(tuple(selected), digests)
 
 
@@ -515,6 +519,7 @@ def guarded_execute(*args: object, **kwargs: object) -> tuple[int, Path | None]:
         GuardrailStateError,
         PythonToolError,
         RunnerError,
+        VocabularyError,
         OSError,
         subprocess.CalledProcessError,
         tomllib.TOMLDecodeError,
