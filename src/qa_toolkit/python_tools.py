@@ -317,11 +317,12 @@ def _import_linter_gate(target: Path, consumer: Consumer) -> tuple[Gate, str] | 
     )
 
 
-def _python_environment(target: Path, consumer: Consumer) -> dict[str, str]:
+def _python_environment(target: Path, root: Path, consumer: Consumer) -> dict[str, str]:
     project = (target / (consumer.python.project or Path("."))).resolve()
-    paths = [project, project / "src"]
-    for root in (project / ".venv", target / ".venv"):
-        paths.extend(sorted(root.glob("lib/python*/site-packages")))
+    paths = [root / "src", project, project / "src"]
+    for environment_root in (project / ".venv", target / ".venv"):
+        paths.extend(sorted(environment_root.glob("lib/python*/site-packages")))
+    existing = tuple(dict.fromkeys(path.resolve() for path in paths if path.exists()))
     cache = target / ".git" / "qat" / "cache"
     (cache / "coverage").mkdir(parents=True, exist_ok=True)
     (cache / "pylint").mkdir(parents=True, exist_ok=True)
@@ -329,7 +330,7 @@ def _python_environment(target: Path, consumer: Consumer) -> dict[str, str]:
         "COVERAGE_FILE": str(cache / "coverage" / ".coverage"),
         "PYLINTHOME": str(cache / "pylint"),
         "PYTHONDONTWRITEBYTECODE": "1",
-        "PYTHONPATH": os.pathsep.join(str(path) for path in paths if path.exists()),
+        "PYTHONPATH": os.pathsep.join(str(path) for path in existing),
     }
 
 
@@ -367,7 +368,11 @@ def resolve_python(target: Path, root: Path, consumer: Consumer) -> PythonResolu
         extra.append(gate)
         digests["import-linter"] = digest
     return PythonResolution(
-        configurations, digests, paths, tuple(extra), _python_environment(target, consumer)
+        configurations,
+        digests,
+        paths,
+        tuple(extra),
+        _python_environment(target, root, consumer),
     )
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -65,6 +66,9 @@ class PythonToolAcceptanceTests(unittest.TestCase):
             [gate.identifier for gate in resolution.gates], ["python-import-directions"]
         )
         self.assertEqual(len(resolution.digests), 8)
+        python_paths = resolution.environment["PYTHONPATH"].split(os.pathsep)
+        self.assertEqual(Path(python_paths[0]), toolkit_root() / "src")
+        self.assertIn(str(self.target), python_paths)
 
         ast = resolve_ast_grep(consumer, target=self.target, root=toolkit_root())
         self.assertEqual(
