@@ -216,14 +216,17 @@ def _skill_records(root: Path, target: Path, profile: Profile) -> list[dict[str,
 
 
 def _skill_current(target: Path, root: Path, item: dict[str, Any]) -> bool:
+    return (
+        _skill_link_current(target, root, item)
+        and _tree_digest(root / str(item["source"])) == item["digest"]
+    )
+
+
+def _skill_link_current(target: Path, root: Path, item: dict[str, Any]) -> bool:
+    """Return whether the consumer still owns the recorded skill link."""
     path = target / str(item["path"])
     source = root / str(item["source"])
-    return (
-        path.is_symlink()
-        and os.readlink(path) == item["target"]
-        and source.is_dir()
-        and _tree_digest(source) == item["digest"]
-    )
+    return path.is_symlink() and os.readlink(path) == item["target"] and source.is_dir()
 
 
 def _reconcile_skills(
@@ -240,7 +243,7 @@ def _reconcile_skills(
     expected_paths = {item["path"] for item in expected}
     for path_string, item in old.items():
         path = target / path_string
-        if not hard_reset and not _skill_current(target, root, item):
+        if not hard_reset and not _skill_link_current(target, root, item):
             raise DeploymentError(f"modified managed skill requires --hard-reset: {path_string}")
         if path_string not in expected_paths and (path.exists() or path.is_symlink()):
             path.unlink()
@@ -263,7 +266,7 @@ def _remove_skills(
     backup: Path | None,
     hard_reset: bool,
 ) -> None:
-    modified = [item for item in records if not _skill_current(target, root, item)]
+    modified = [item for item in records if not _skill_link_current(target, root, item)]
     if modified and backup is None and not hard_reset:
         raise DeploymentError(
             "modified managed skills require --backup PATH or --hard-reset: "
@@ -403,6 +406,13 @@ def enroll(
             path = target / item["path"]
             if path.exists() or path.is_symlink():
                 path.unlink()
+            parent = path.parent
+            while parent != target and parent.name != ".git":
+                try:
+                    parent.rmdir()
+                except OSError:
+                    break
+                parent = parent.parent
         if exclude["owned"]:
             _atomic_text(target / ".git/info/exclude", str(exclude["before"]))
         if state.exists():
@@ -679,7 +689,7 @@ def unenroll(
     skill_modified = [
         item
         for item in skill_records
-        if not _skill_current(target, Path(str(record["toolkit_root"])), item)
+        if not _skill_link_current(target, Path(str(record["toolkit_root"])), item)
     ]
     if skill_modified and backup is None and not hard_reset:
         raise DeploymentError(

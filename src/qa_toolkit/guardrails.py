@@ -99,7 +99,7 @@ def _symlinked(target: Path, relative: str) -> bool:
 
 
 def extract_apply_patch_paths(command: str, cwd: Path, target: Path) -> tuple[str, ...]:
-    """Extract every file touched by one canonical apply_patch document."""
+    """Extract every file touched by one exact apply_patch document."""
     if len(command.encode()) > 1_048_576:
         raise ValueError("apply_patch input exceeds one MiB")
     lines = command.splitlines()

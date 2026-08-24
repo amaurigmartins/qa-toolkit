@@ -231,7 +231,17 @@ def load_consumer_vocabulary(target: Path) -> ConsumerVocabulary:
     """Load the optional repository vocabulary through a closed schema."""
     consumer = load_consumer(target)
     if consumer.vocabulary_file is None:
-        return _empty_consumer_vocabulary()
+        empty = _empty_consumer_vocabulary()
+        return ConsumerVocabulary(
+            tuple(dict.fromkeys((*consumer.vocabulary_additions, *consumer.vocabulary_allowances))),
+            empty.rejected,
+            empty.replacements,
+            empty.acronyms,
+            empty.roles,
+            empty.allowances,
+            empty.locale,
+            empty.source_additions,
+        )
     path = target / consumer.vocabulary_file
     value = _load_toml(path)
     closed_keys(
@@ -282,8 +292,17 @@ def load_consumer_vocabulary(target: Path) -> ConsumerVocabulary:
                 "reason": reason,
             }
         )
+    accepted = _strings(terminology.get("accepted", []), f"{path}.terminology.accepted")
     return ConsumerVocabulary(
-        accepted=_strings(terminology.get("accepted", []), f"{path}.terminology.accepted"),
+        accepted=tuple(
+            dict.fromkeys(
+                (
+                    *accepted,
+                    *consumer.vocabulary_additions,
+                    *consumer.vocabulary_allowances,
+                )
+            )
+        ),
         rejected=_strings(terminology.get("rejected", []), f"{path}.terminology.rejected"),
         replacements={str(key): str(item) for key, item in replacements_raw.items()},
         acronyms=_strings(acronym_table.get("accepted", []), f"{path}.acronyms.accepted"),
@@ -322,7 +341,7 @@ def _vale_rule(level: str, terms: set[str]) -> str:
 
 def _symlink(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.symlink_to(os.path.relpath(source, destination.parent), target_is_directory=True)
+    destination.symlink_to(source.resolve(strict=True), target_is_directory=True)
 
 
 def _resolved(corpus: Corpus, consumer: ConsumerVocabulary) -> dict[str, object]:
@@ -416,7 +435,19 @@ def _write_outputs(stage: Path, root: Path, resolved: dict[str, object]) -> str:
     central_styles = root / "config" / "vale" / "styles"
     for name in ("STECode", "ai-tells", "config"):
         _symlink(central_styles / name, stage / "vale" / "styles" / name)
-    shutil.copy2(root / "config/vale/.vale.ini", stage / "vale/.vale.ini")
+    vale_configuration = (root / "config/vale/.vale.ini").read_text(encoding="utf-8")
+    locale = str(resolved["locale"]).casefold()
+    if locale == "en-gb":
+        spelling_override = "STECode.AmericanSpelling = NO"
+    elif locale == "en-us":
+        spelling_override = "STECode.BritishSpelling = NO"
+    else:
+        raise CorpusError(f"unsupported corpus locale: {resolved['locale']}")
+    vale_configuration = vale_configuration.replace(
+        "BasedOnStyles = STECode, OwnedTerms, RepositoryTerms\n",
+        "BasedOnStyles = STECode, OwnedTerms, RepositoryTerms\n" + spelling_override + "\n",
+    )
+    (stage / "vale/.vale.ini").write_text(vale_configuration, encoding="utf-8")
     shutil.copy2(root / "config/vale/ai-tells.ini", stage / "vale/ai-tells.ini")
     (stage / "vale/styles/OwnedTerms/Forbidden.yml").write_text(
         _vale_rule("error", set(cast(list[str], resolved["shared_errors"]))), encoding="utf-8"

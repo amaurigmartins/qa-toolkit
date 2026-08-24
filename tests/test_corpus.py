@@ -98,6 +98,10 @@ class CorpusTests(unittest.TestCase):
             self.assertIn("RLS", resolved["acronyms"])
             self.assertIn("form_entry", resolved["roles"]["concept"])
             self.assertTrue((destination / "vale/styles/ai-tells").is_symlink())
+            self.assertTrue((destination / "vale/styles/ai-tells").resolve().is_dir())
+            self.assertTrue(
+                (destination / "vale/styles/config/views/PythonDocstrings.yml").is_file()
+            )
             cspell = json.loads((destination / "cspell.json").read_text(encoding="utf-8"))
             self.assertIn("Gridform", cspell["words"])
 

@@ -13,7 +13,7 @@ class ConfigurationError(RuntimeError):
 
 
 class PythonTool(StrEnum):
-    """Python analyzer that supports a bounded consumer exception."""
+    """Python analyser that supports a bounded consumer exception."""
 
     RUFF = "ruff"
 
@@ -58,7 +58,7 @@ class PydoclintSettings:
 
 @dataclass(frozen=True, order=True)
 class PythonException:
-    """One rule, bounded path, and reason-bearing analyzer exception."""
+    """One rule, bounded path, and reason-bearing analyser exception."""
 
     tool: PythonTool
     rule: str

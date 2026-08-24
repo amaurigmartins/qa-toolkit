@@ -629,7 +629,7 @@ def _install_julia_qa(root: Path) -> None:
 
 
 def fetch_environment(environment: str, root: Path | None = None, *, force: bool = False) -> None:
-    """Install one shared locked ecosystem environment atomically."""
+    """Install one shared locked tool environment atomically."""
     repository = root or toolkit_root()
     tools = tuple(tool for tool in load_registry(repository) if tool.environment == environment)
     current = bool(tools) and all(tool_status(tool, repository)[0] for tool in tools)

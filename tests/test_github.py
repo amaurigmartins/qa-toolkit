@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from qa_toolkit import github
 from qa_toolkit.github import (
     GitHubCheck,
     GitHubClient,
@@ -312,6 +313,190 @@ class GitHubClientTests(unittest.TestCase):
             self.assertRaisesRegex(RuntimeError, "not authenticated"),
         ):
             self.client.repository("owner/repository")
+
+
+class GitHubBoundaryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = GitHubClient(Path("/usr/bin/gh"), {"PATH": "/bin"})
+
+    def test_records_and_discovery_have_closed_local_shapes(self) -> None:
+        issue = GitHubIssue("owner/repository", 1, "OPEN", "Title", "url")
+        pull = GitHubPullRequest(
+            "owner/repository", 2, "OPEN", True, "head", "main", "Title", "url", (1,)
+        )
+        check = GitHubCheck("quality", "SUCCESS", "pass", "CI", "url")
+        self.assertEqual(issue.as_dict()["number"], 1)
+        self.assertEqual(pull.as_dict()["closing_issues"], [1])
+        self.assertEqual(check.as_dict()["bucket"], "pass")
+        with (
+            patch("qa_toolkit.github.payload_root", return_value=Path("/missing")),
+            self.assertRaisesRegex(RuntimeError, "not installed"),
+        ):
+            GitHubClient.discover()
+
+    def test_command_execution_rejects_process_and_output_failures(self) -> None:
+        with (
+            patch("qa_toolkit.github.subprocess.run", side_effect=OSError("missing")),
+            self.assertRaisesRegex(RuntimeError, "GitHub CLI status failed"),
+        ):
+            github._run_github_command(
+                Path("/gh"), {}, ("status",), allowed_statuses=frozenset({0})
+            )
+        excessive = _completed("x" * (github._MAX_OUTPUT + 1))
+        with (
+            patch("qa_toolkit.github.subprocess.run", return_value=excessive),
+            self.assertRaisesRegex(RuntimeError, "size limit"),
+        ):
+            github._run_github_command(
+                Path("/gh"), {}, ("status",), allowed_statuses=frozenset({0})
+            )
+
+    def test_identity_title_branch_body_and_url_primitives_fail_closed(self) -> None:
+        for number in (0, True, -1):
+            with self.subTest(number=number), self.assertRaises(RuntimeError):
+                github._positive_number(number, "issue")
+        for title in ("", 'bad"title', "x" * 257, "bad\ntitle"):
+            with self.subTest(title=title), self.assertRaisesRegex(RuntimeError, "title"):
+                github._title(title)
+        for branch in ("", "branch/", "branch.", "branch.lock", "a..b", "a//b"):
+            with self.subTest(branch=branch), self.assertRaisesRegex(RuntimeError, "branch"):
+                github._branch(branch)
+        for url, message in (
+            ("not-a-url", "malformed URL"),
+            ("https://github.com/other/repository/issues/1", "mismatched identity"),
+        ):
+            with self.subTest(url=url), self.assertRaisesRegex(RuntimeError, message):
+                github._created_number(url, "owner/repository", "issues")
+        with tempfile.TemporaryDirectory() as raw:
+            body = Path(raw) / "body.md"
+            body.write_bytes(b"x" * (github._MAX_BODY_BYTES + 1))
+            with self.assertRaisesRegex(RuntimeError, "exceeds"):
+                github._body_file(body)
+            body.write_bytes(b"\xff")
+            with self.assertRaisesRegex(RuntimeError, "UTF-8"):
+                github._body_file(body)
+
+    def test_remote_records_reject_number_url_duplicate_and_choice_mismatches(self) -> None:
+        issue = json.loads(_issue())
+        with self.assertRaisesRegex(RuntimeError, "different issue number"):
+            github._issue_record(issue, "owner/repository", 41)
+        issue["url"] = "https://github.com/owner/repository/issues/41"
+        with self.assertRaisesRegex(RuntimeError, "URL identity mismatch"):
+            github._issue_record(issue, "owner/repository")
+
+        pull = json.loads(_pull_request(closing=(42, 42)))
+        with self.assertRaisesRegex(RuntimeError, "different pull-request number"):
+            github._pull_request_record(pull, "owner/repository", 44)
+        with self.assertRaisesRegex(RuntimeError, "duplicate closing issues"):
+            github._pull_request_record(pull, "owner/repository")
+        pull = json.loads(_pull_request())
+        pull["url"] = "https://github.com/owner/repository/pull/44"
+        with self.assertRaisesRegex(RuntimeError, "URL identity mismatch"):
+            github._pull_request_record(pull, "owner/repository")
+        with self.assertRaisesRegex(RuntimeError, "invalid value"):
+            github._check(
+                {
+                    "name": "quality",
+                    "state": "SUCCESS",
+                    "bucket": "unknown",
+                    "workflow": "CI",
+                    "link": "url",
+                },
+                0,
+            )
+
+    def test_issue_operations_verify_open_state_and_convergence(self) -> None:
+        body = Path("/body.md")
+        open_issue = GitHubIssue("owner/repository", 42, "OPEN", "Old", "url")
+        closed_issue = GitHubIssue("owner/repository", 42, "CLOSED", "Old", "url")
+        with (
+            patch.object(GitHubClient, "repository", return_value="owner/repository"),
+            patch.object(GitHubClient, "_issue", return_value=closed_issue),
+            patch("qa_toolkit.github._body_file", return_value=body),
+            self.assertRaisesRegex(RuntimeError, "not open"),
+        ):
+            self.client.update_issue("owner/repository", 42, title="Title", body_file=body)
+        with (
+            patch.object(GitHubClient, "repository", return_value="owner/repository"),
+            patch.object(GitHubClient, "_issue_list", return_value=()),
+            patch.object(
+                GitHubClient,
+                "_run",
+                return_value=_completed("https://github.com/owner/repository/issues/42"),
+            ),
+            patch.object(GitHubClient, "_issue", return_value=open_issue),
+            patch("qa_toolkit.github._body_file", return_value=body),
+            self.assertRaisesRegex(RuntimeError, "did not converge"),
+        ):
+            self.client.create_issue("owner/repository", title="Title", body_file=body)
+        with (
+            patch.object(GitHubClient, "repository", return_value="owner/repository"),
+            patch.object(GitHubClient, "_issue", side_effect=(open_issue, open_issue)),
+            patch.object(GitHubClient, "_run", return_value=_completed()),
+            patch("qa_toolkit.github._body_file", return_value=body),
+            self.assertRaisesRegex(RuntimeError, "title did not converge"),
+        ):
+            self.client.update_issue("owner/repository", 42, title="Title", body_file=body)
+
+    def test_pull_request_operations_verify_open_draft_and_convergence(self) -> None:
+        body = Path("/body.md")
+        open_draft = GitHubPullRequest(
+            "owner/repository", 43, "OPEN", True, "head", "main", "Old", "url", ()
+        )
+        closed = GitHubPullRequest(
+            "owner/repository", 43, "CLOSED", False, "head", "main", "Old", "url", ()
+        )
+        with (
+            patch.object(GitHubClient, "repository", return_value="owner/repository"),
+            patch("qa_toolkit.github._body_file", return_value=body),
+            patch.object(GitHubClient, "_pull_request", return_value=closed),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "not open"):
+                self.client.update_pull_request(
+                    "owner/repository", 43, title="Title", body_file=body
+                )
+            with self.assertRaisesRegex(RuntimeError, "closed pull request"):
+                self.client.comment("owner/repository", 43, body_file=body)
+        with (
+            patch.object(GitHubClient, "repository", return_value="owner/repository"),
+            patch.object(GitHubClient, "_pull_request", return_value=closed),
+            self.assertRaisesRegex(RuntimeError, "not an open draft"),
+        ):
+            self.client.ready("owner/repository", 43)
+        with (
+            patch.object(GitHubClient, "repository", return_value="owner/repository"),
+            patch.object(GitHubClient, "_pull_request_list", return_value=()),
+            patch.object(
+                GitHubClient,
+                "_run",
+                return_value=_completed("https://github.com/owner/repository/pull/43"),
+            ),
+            patch.object(GitHubClient, "_pull_request", return_value=open_draft),
+            patch("qa_toolkit.github._body_file", return_value=body),
+            self.assertRaisesRegex(RuntimeError, "did not converge"),
+        ):
+            self.client.create_pull_request(
+                "owner/repository",
+                head="head",
+                base="main",
+                title="Title",
+                body_file=body,
+            )
+        with (
+            patch.object(GitHubClient, "repository", return_value="owner/repository"),
+            patch.object(GitHubClient, "_pull_request", side_effect=(open_draft, open_draft)),
+            patch.object(GitHubClient, "_run", return_value=_completed()),
+            patch("qa_toolkit.github._body_file", return_value=body),
+            self.assertRaisesRegex(RuntimeError, "title did not converge"),
+        ):
+            self.client.update_pull_request("owner/repository", 43, title="Title", body_file=body)
+        with (
+            patch.object(GitHubClient, "repository", return_value="owner/repository"),
+            patch.object(GitHubClient, "_pull_request", side_effect=(open_draft, open_draft)),
+            patch.object(GitHubClient, "_run", return_value=_completed()),
+            self.assertRaisesRegex(RuntimeError, "did not become ready"),
+        ):
+            self.client.ready("owner/repository", 43)
         malformed = (_completed(), _completed('{"nameWithOwner":"a","nameWithOwner":"b"}'))
         with (
             patch("qa_toolkit.github.subprocess.run", side_effect=malformed),

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from test_deployment import _central, _consumer, _git
 
-from qa_toolkit.deployment import enroll
+from qa_toolkit.deployment import enroll, sync
 from qa_toolkit.paths import toolkit_root
 from qa_toolkit.runner import execute
 
@@ -231,6 +231,31 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(code, 0)
             summary = json.loads((evidence / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(summary["planned_order"], [])
+
+    def test_recursive_trigger_matches_a_root_level_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root, target = _runner_fixture(Path(directory))
+            profile = root / "profiles/fixture.toml"
+            profile.write_text(
+                profile.read_text(encoding="utf-8").replace(
+                    'triggers = ["src/**"]', 'triggers = ["**/*.py"]'
+                ),
+                encoding="utf-8",
+            )
+            _commit(root, "test(profile): use recursive trigger")
+            sync(target, root)
+
+            code, evidence = execute(
+                target,
+                "check",
+                variant="normal",
+                changed=("gate.py",),
+                root=root,
+            )
+
+            self.assertEqual(code, 0)
+            summary = json.loads((evidence / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["planned_order"], ["check-pass"])
 
 
 if __name__ == "__main__":

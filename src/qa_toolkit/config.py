@@ -550,7 +550,7 @@ def digest_consumer(consumer: Consumer) -> str:
 
 
 def profile_summary(profile: Profile) -> str:
-    """Serialize stable profile facts for command output."""
+    """Serialise stable profile facts for command output."""
     return json.dumps(
         {
             "name": profile.name,

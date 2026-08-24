@@ -45,6 +45,8 @@ def _central(root: Path) -> None:
     (root / "config/sample").mkdir(parents=True)
     (root / "config/sample/link.txt").write_text("linked\n", encoding="utf-8")
     (root / "config/sample/copy.txt").write_text("alpha\nbase\ngamma\n", encoding="utf-8")
+    (root / "library/skills/sample").mkdir(parents=True)
+    (root / "library/skills/sample/SKILL.md").write_text("sample one\n", encoding="utf-8")
     (root / "profiles").mkdir()
     (root / "profiles/fixture.toml").write_text(
         """schema_version = 1
@@ -52,7 +54,7 @@ name = "fixture"
 tools = ["jq"]
 gates = []
 hooks = []
-skills = []
+skills = ["library/skills/sample"]
 
 [[configurations]]
 id = "linked"
@@ -204,6 +206,26 @@ class DeploymentTests(unittest.TestCase):
 
             sync(target, root, hard_reset=True)
             self.assertEqual(link.read_text(encoding="utf-8"), "linked\n")
+
+    def test_sync_accepts_a_central_update_through_an_unchanged_skill_link(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            root = parent / "central"
+            target = parent / "consumer"
+            root.mkdir()
+            target.mkdir()
+            _central(root)
+            _consumer(target)
+            enroll(target, root)
+            deployed = target / ".agents/skills/sample/SKILL.md"
+            self.assertEqual(deployed.read_text(encoding="utf-8"), "sample one\n")
+            (root / "library/skills/sample/SKILL.md").write_text("sample two\n", encoding="utf-8")
+
+            self.assertFalse(status(target, root)["current"])
+            sync(target, root)
+
+            self.assertEqual(deployed.read_text(encoding="utf-8"), "sample two\n")
+            self.assertTrue(status(target, root)["current"])
 
 
 if __name__ == "__main__":

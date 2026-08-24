@@ -519,9 +519,24 @@ def _git_path(raw: bytes) -> str:
 
 
 def _worktree_fingerprint(target: Path) -> str:
-    return hashlib.sha256(
-        _git(target, ("status", "--porcelain=v1", "-z", "--untracked-files=all")).stdout
-    ).hexdigest()
+    status = _git(target, ("status", "--porcelain=v1", "-z", "--untracked-files=all")).stdout
+    hasher = hashlib.sha256(status)
+    for relative in _changes(target):
+        path = target / relative
+        hasher.update(relative.encode("utf-8"))
+        try:
+            mode = os.lstat(path).st_mode
+        except FileNotFoundError:
+            hasher.update(b"\0missing")
+            continue
+        hasher.update(mode.to_bytes(8, "big"))
+        if stat.S_ISLNK(mode):
+            hasher.update(os.readlink(path).encode("utf-8"))
+        elif stat.S_ISREG(mode):
+            with path.open("rb") as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b""):
+                    hasher.update(block)
+    return hasher.hexdigest()
 
 
 def _validate_paths(target: Path, changed: Sequence[str], allowed: Sequence[str]) -> None:

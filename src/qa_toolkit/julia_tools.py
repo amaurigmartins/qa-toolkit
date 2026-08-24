@@ -93,7 +93,11 @@ def _package_identity(document: dict[str, object], relative: str) -> str | None:
     name, uuid, version = values
     if not isinstance(name, str) or not name or not name.replace("_", "a").isalnum():
         raise JuliaToolError(f"Julia project has an invalid package name: {relative}")
-    if not isinstance(uuid, str) or str(UUID(uuid)) != uuid:
+    try:
+        normalized_uuid = str(UUID(uuid)) if isinstance(uuid, str) else ""
+    except ValueError:
+        normalized_uuid = ""
+    if normalized_uuid != uuid:
         raise JuliaToolError(f"Julia project has an invalid package UUID: {relative}")
     if not isinstance(version, str) or not version or len(version) > 128:
         raise JuliaToolError(f"Julia project has an invalid package version: {relative}")

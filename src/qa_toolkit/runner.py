@@ -18,6 +18,7 @@ from typing import Literal
 
 from qa_toolkit.ast_grep import AstGrepPolicyError, resolve_ast_grep
 from qa_toolkit.config import digest_consumer, digest_profile, load_consumer, load_profile
+from qa_toolkit.corpus import CorpusError, build_corpus
 from qa_toolkit.deployment import DeploymentError, resolve_target, status
 from qa_toolkit.guardrail_state import GuardrailStateError, identity, record_proof
 from qa_toolkit.models import ConsumerGate, Gate
@@ -64,7 +65,12 @@ class RunnerError(RuntimeError):
 def _matches(triggers: tuple[str, ...], changed: tuple[str, ...]) -> bool:
     if not changed:
         return True
-    return any(fnmatch.fnmatch(path, pattern) for path in changed for pattern in triggers)
+    return any(
+        fnmatch.fnmatchcase(path, pattern)
+        or (pattern.startswith("**/") and fnmatch.fnmatchcase(path, pattern[3:]))
+        for path in changed
+        for pattern in triggers
+    )
 
 
 def _target_python(target: Path, consumer_project: Path | None, root: Path) -> Path:
@@ -191,6 +197,9 @@ def _resolve_plan(
         raise RunnerError("repository deployment is stale; run qat repo sync")
     consumer = load_consumer(target)
     profile = load_profile(consumer.profile, root)
+    corpus_digest = None
+    if {"cspell", "vale"} & set(profile.tools):
+        corpus_digest, _destination = build_corpus(target, root)
     target_python = _target_python(target, consumer.python.project, root)
     python = resolve_python(target, root, consumer) if "ruff" in profile.tools else None
     ast_grep = resolve_ast_grep(consumer, target=target, root=root)
@@ -250,6 +259,8 @@ def _resolve_plan(
                 )
             )
     digests = {} if python is None else dict(python.digests)
+    if corpus_digest is not None:
+        digests["corpus"] = corpus_digest
     if ast_grep.digest is not None:
         digests["consumer-ast-grep"] = ast_grep.digest
     return ResolvedPlan(tuple(selected), digests)
@@ -437,6 +448,7 @@ def guarded_execute(*args: object, **kwargs: object) -> tuple[int, Path | None]:
         return execute(*args, **kwargs)  # type: ignore[arg-type]
     except (
         AstGrepPolicyError,
+        CorpusError,
         DeploymentError,
         GuardrailStateError,
         PythonToolError,

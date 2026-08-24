@@ -75,6 +75,9 @@ def _cog(target: Path, root: Path, message: str) -> int:
     temporary_root.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="cog-", dir=temporary_root) as raw:
         temporary = Path(raw)
+        _git(temporary, "init", "--quiet")
+        _git(temporary, "config", "user.name", "qa-toolkit")
+        _git(temporary, "config", "user.email", "qa-toolkit@example.invalid")
         config = temporary / ".gitconfig"
         config.write_text(
             "[user]\n\tname = qa-toolkit\n\temail = qa-toolkit@example.invalid\n",
@@ -91,7 +94,7 @@ def _cog(target: Path, root: Path, message: str) -> int:
         try:
             result = subprocess.run(
                 [str(executable), *COCOGITTO_ARGUMENTS],
-                cwd=target,
+                cwd=temporary,
                 env=environment,
                 input=message,
                 check=False,

@@ -130,3 +130,37 @@ severity = "blocking"
 variants = []
 finding_exit_codes = [1]
 execution_error_exit_codes = [2, 3, 4, 5]
+
+
+[[gates]]
+id = "text-spelling"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "cspell", "--target", "."]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.py", "**/*.jl", "**/*.toml", "**/*.json", "**/*.yml", "**/*.yaml", "**/*.sh"]
+timeout = 300
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "text-prose"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "vale", "--target", "."]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.py", "**/*.jl"]
+timeout = 300
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "text-ai-tells"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "vale", "--target", ".", "--advisory"]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.py", "**/*.jl"]
+timeout = 300
+severity = "advisory"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
