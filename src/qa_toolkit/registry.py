@@ -19,7 +19,7 @@ import zipfile
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from qa_toolkit.paths import payload_root, toolkit_root
 
@@ -236,11 +236,15 @@ def tool_status(tool: Tool, root: Path | None = None) -> tuple[bool, str]:
 
 
 def _download(url: str, destination: Path) -> None:
-    request = urllib.request.Request(url, headers={"User-Agent": "qa-toolkit/0.1"})
+    request = urllib.request.Request(  # noqa: S310 - registry URLs use reviewed HTTPS sources.
+        url, headers={"User-Agent": "qa-toolkit/0.1"}
+    )
     try:
-        with urllib.request.urlopen(request, timeout=120) as response:  # noqa: S310
-            with destination.open("wb") as stream:
-                shutil.copyfileobj(response, stream)
+        with (
+            urllib.request.urlopen(request, timeout=120) as response,  # noqa: S310
+            destination.open("wb") as stream,
+        ):
+            shutil.copyfileobj(response, stream)
     except (OSError, urllib.error.URLError) as error:
         raise RegistryError(f"download failed: {url}: {error}") from error
 
@@ -269,20 +273,29 @@ def _extract(archive: Path, kind: str, destination: Path, executables: tuple[str
         target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         return
     if kind in {"tar.gz", "tar.xz"}:
-        tar_bundle = (
-            tarfile.open(archive, "r:gz") if kind == "tar.gz" else tarfile.open(archive, "r:xz")
-        )
-        with tar_bundle:
-            members = tar_bundle.getmembers()
-            if any(not _safe_member(member.name) for member in members):
+        mode: Literal["r:gz", "r:xz"] = "r:gz" if kind == "tar.gz" else "r:xz"
+        with tarfile.open(archive, mode) as tar_bundle:
+            tar_members = tar_bundle.getmembers()
+            if any(not _safe_member(member.name) for member in tar_members):
                 raise RegistryError("archive contains an unsafe path")
-            tar_bundle.extractall(destination, members=members, filter="data")
+            tar_bundle.extractall(destination, members=tar_members, filter="data")
         return
     if kind == "zip":
         with zipfile.ZipFile(archive) as zip_bundle:
-            if any(not _safe_member(name) for name in zip_bundle.namelist()):
+            zip_members = zip_bundle.infolist()
+            if any(not _safe_member(member.filename) for member in zip_members):
                 raise RegistryError("archive contains an unsafe path")
-            zip_bundle.extractall(destination)
+            for member in zip_members:
+                target = destination / member.filename
+                unix_mode = member.external_attr >> 16
+                if stat.S_ISLNK(unix_mode):
+                    raise RegistryError("archive contains a symbolic link")
+                if member.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with zip_bundle.open(member) as source, target.open("wb") as output:
+                    shutil.copyfileobj(source, output)
         return
     raise RegistryError(f"unsupported archive kind: {kind}")
 
@@ -314,7 +327,7 @@ def _replace_directory(staged: Path, target: Path) -> None:
             shutil.rmtree(previous)
 
 
-def _prepare_asset(tool: Tool, root: Path, work: Path) -> Path:
+def _prepare_asset(tool: Tool, work: Path) -> Path:
     if tool.asset.url is None or tool.asset.archive is None:
         raise RegistryError(f"{tool.tool_id}: no downloadable Linux asset")
     download = work / Path(urllib.parse.urlparse(tool.asset.url).path).name
@@ -332,7 +345,7 @@ def _prepare_asset(tool: Tool, root: Path, work: Path) -> Path:
         executable = _find_executable(payload, executable_name)
         relative = os.path.relpath(executable, binary_directory)
         (binary_directory / executable_name).symlink_to(relative)
-    valid, detail = tool_status(tool, _staged_root(root, tool, staged))
+    valid, detail = tool_status(tool, _staged_root(tool, staged))
     if not valid:
         raise RegistryError(f"{tool.tool_id}: staged version check failed: {detail}")
     return staged
@@ -343,14 +356,14 @@ def _install_asset(tool: Tool, root: Path) -> None:
     staging_root.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix=f"{tool.tool_id}-", dir=staging_root))
     try:
-        staged = _prepare_asset(tool, root, work)
+        staged = _prepare_asset(tool, work)
         _replace_directory(staged, payload_root(root) / tool.tool_id)
     finally:
         if work.exists():
             shutil.rmtree(work)
 
 
-def _staged_root(root: Path, tool: Tool, staged: Path) -> Path:
+def _staged_root(tool: Tool, staged: Path) -> Path:
     """Create a temporary root view that points status checks at *staged*."""
     view = staged.parent / "view"
     (view / "toolkit").mkdir(parents=True, exist_ok=True)
@@ -358,7 +371,7 @@ def _staged_root(root: Path, tool: Tool, staged: Path) -> Path:
     return view
 
 
-def _environment_view(root: Path, environment: str, staged: Path) -> Path:
+def _environment_view(environment: str, staged: Path) -> Path:
     view = staged.parent / f"view-{environment}"
     toolkit = view / "toolkit"
     toolkit.mkdir(parents=True, exist_ok=True)
@@ -428,7 +441,7 @@ def _install_python_environment(root: Path) -> None:
             ],
             environment=environment,
         )
-        view = _environment_view(root, "python", staged)
+        view = _environment_view("python", staged)
         for tool in load_registry(root):
             if tool.environment == "python" and tool.asset.executables:
                 valid, detail = tool_status(tool, view)
@@ -478,7 +491,7 @@ def _install_node_environment(root: Path) -> None:
         cspell_link = staged / "bin" / "cspell"
         if not cspell_link.exists():
             cspell_link.symlink_to("../node_modules/.bin/cspell")
-        view = _environment_view(root, "node", staged)
+        view = _environment_view("node", staged)
         for tool in (node, cspell):
             valid, detail = tool_status(tool, view)
             if not valid:
@@ -507,7 +520,7 @@ def _install_julia_runtime(tool: Tool, root: Path) -> None:
             raise RegistryError("Julia asset must contain exactly one runtime root")
         staged = work / "runtime"
         os.replace(roots[0], staged)
-        view = _environment_view(root, tool.environment, staged)
+        view = _environment_view(tool.environment, staged)
         valid, detail = tool_status(tool, view)
         if not valid:
             raise RegistryError(f"{tool.tool_id}: staged version check failed: {detail}")
@@ -608,7 +621,7 @@ def update_standalone(
     moved_previous = False
     activated = False
     try:
-        staged = _prepare_asset(proposed, repository, work)
+        staged = _prepare_asset(proposed, work)
         registry_temporary.write_text(
             f"{json.dumps(raw, indent=2, sort_keys=False)}\n", encoding="utf-8"
         )

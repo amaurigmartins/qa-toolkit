@@ -62,7 +62,7 @@ def _validate_consumer_paths(target: Path, consumer: Consumer) -> None:
             consumer.vocabulary_file,
             consumer.ast_grep_config,
             consumer.ast_grep_tests,
-            consumer.python_project,
+            consumer.python.project,
         )
         if path is not None
     )

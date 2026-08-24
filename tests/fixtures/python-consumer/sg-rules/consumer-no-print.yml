@@ -1,0 +1,6 @@
+id: consumer-no-print
+language: Python
+rule:
+  pattern: print($$$ARGS)
+message: Library code must not write directly to standard output.
+severity: error

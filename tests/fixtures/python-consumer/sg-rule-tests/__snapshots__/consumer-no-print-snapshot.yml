@@ -1,0 +1,8 @@
+id: consumer-no-print
+snapshots:
+  print("measured"):
+    labels:
+    - source: print("measured")
+      style: primary
+      start: 0
+      end: 17

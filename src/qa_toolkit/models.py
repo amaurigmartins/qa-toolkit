@@ -3,12 +3,78 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 
 class ConfigurationError(RuntimeError):
     """Report invalid tracked configuration."""
+
+
+class PythonTool(StrEnum):
+    """Python analyzer that supports a bounded consumer exception."""
+
+    RUFF = "ruff"
+
+
+@dataclass(frozen=True)
+class RuffThresholds:
+    """Optional stricter Ruff limits selected by a repository."""
+
+    max_complexity: int | None = None
+    max_args: int | None = None
+    max_returns: int | None = None
+
+
+@dataclass(frozen=True)
+class RuffSettings:
+    """Typed additions to the central Ruff configuration."""
+
+    extend_select: tuple[str, ...] = ()
+    enforce: tuple[str, ...] = ()
+    paths: tuple[str, ...] = ()
+    known_first_party: tuple[str, ...] = ()
+    thresholds: RuffThresholds = RuffThresholds()
+
+
+@dataclass(frozen=True)
+class PylintSettings:
+    """Typed additions to the central Pylint configuration."""
+
+    enable: tuple[str, ...] = ()
+    paths: tuple[str, ...] = ()
+    min_similarity_lines: int | None = None
+
+
+@dataclass(frozen=True)
+class PydoclintSettings:
+    """Typed additions to the central Pydoclint configuration."""
+
+    paths: tuple[str, ...] = ()
+    skip_checking_short_docstrings: bool | None = None
+    check_class_attributes: bool | None = None
+
+
+@dataclass(frozen=True, order=True)
+class PythonException:
+    """One rule, bounded path, and reason-bearing analyzer exception."""
+
+    tool: PythonTool
+    rule: str
+    path: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class PythonSettings:
+    """Python project location and optional stricter tool settings."""
+
+    project: Path | None = None
+    ruff: RuffSettings | None = None
+    pylint: PylintSettings | None = None
+    pydoclint: PydoclintSettings | None = None
+    exceptions: tuple[PythonException, ...] = ()
 
 
 def closed_keys(value: dict[str, Any], allowed: set[str], context: str) -> None:
@@ -114,7 +180,7 @@ class Consumer:
     vocabulary_allowances: tuple[str, ...]
     ast_grep_config: Path | None
     ast_grep_tests: Path | None
-    python_project: Path | None
+    python: PythonSettings
     gates: tuple[ConsumerGate, ...]
     protected_paths: tuple[Path, ...]
     work_state_directory: Path

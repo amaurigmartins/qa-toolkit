@@ -14,6 +14,7 @@ from qa_toolkit.registry import (
     load_registry,
     select_tools,
     tool_status,
+    update_standalone,
 )
 
 
@@ -101,8 +102,6 @@ def main(arguments: Sequence[str] | None = None) -> None:
         elif options.operation == "fetch":
             code = _fetch(options.tools, options.all, options.force)
         else:
-            from qa_toolkit.registry import update_standalone
-
             update_standalone(
                 options.tool,
                 options.version,

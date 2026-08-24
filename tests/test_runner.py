@@ -7,10 +7,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from test_deployment import _central, _consumer, _git
+
 from qa_toolkit.deployment import enroll
 from qa_toolkit.paths import toolkit_root
 from qa_toolkit.runner import execute
-from test_deployment import _central, _consumer, _git
 
 
 def _commit(repository: Path, message: str) -> None:

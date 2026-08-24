@@ -7,10 +7,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from test_deployment import _git
+
 from qa_toolkit.corpus import CorpusError, build_corpus, load_corpus
 from qa_toolkit.deployment import enroll, sync
 from qa_toolkit.paths import toolkit_root
-from test_deployment import _git
 
 
 def _consumer(target: Path, vocabulary: str) -> None:

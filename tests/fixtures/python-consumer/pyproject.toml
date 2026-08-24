@@ -1,0 +1,13 @@
+[project]
+name = "qa-toolkit-disposable-python"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.importlinter]
+root_packages = ["package"]
+
+[[tool.importlinter.contracts]]
+name = "Package direction"
+type = "layers"
+layers = ["package"]

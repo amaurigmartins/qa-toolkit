@@ -310,7 +310,8 @@ def _vale_rule(level: str, terms: set[str]) -> str:
     patterns = sorted({_pattern(term) for term in terms}) or ["a^"]
     lines = [
         "extends: existence",
-        "message: \"Replace vague terminology '%s' with the exact operation, object, or property.\"",
+        "message: \"Replace vague terminology '%s' with the exact operation, "
+        'object, or property."',
         f"level: {level}",
         "ignorecase: true",
         "tokens:",

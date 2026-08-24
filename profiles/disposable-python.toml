@@ -1,12 +1,131 @@
 schema_version = 1
 name = "disposable-python"
 tools = [
-  "uv", "gitleaks", "cocogitto", "shellcheck", "actionlint", "osv-scanner", "zizmor",
+  "uv", "gitleaks", "cocogitto", "fd", "ripgrep", "shellcheck", "actionlint", "osv-scanner", "zizmor",
   "ast-grep", "vale", "node", "cspell", "python", "ruff", "mypy", "pytest", "coverage",
   "pytest-cov", "pylint", "vulture", "import-linter", "pydoclint", "grain", "slop", "pip-audit",
 ]
 configurations = []
-gates = []
 hooks = []
 skills = []
 
+[[gates]]
+id = "python-format"
+phase = "check"
+argv = ["{tool:ruff}", "format", "--check", "--no-cache", "--config", "{python-config:ruff}", "{python-paths:ruff}"]
+triggers = ["**"]
+timeout = 120
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "python-lint"
+phase = "check"
+argv = ["{tool:ruff}", "check", "--no-cache", "--config", "{python-config:ruff}", "{python-paths:ruff}"]
+triggers = ["**"]
+timeout = 120
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "python-types"
+phase = "check"
+argv = ["{tool:mypy}", "--config-file", "{python-config:mypy}", "--python-executable", "{target-python}", "{python-paths:ruff}"]
+triggers = ["**"]
+timeout = 180
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "python-pylint"
+phase = "check"
+argv = ["{tool:pylint}", "--rcfile", "{python-config:pylint}", "{python-paths:pylint}"]
+triggers = ["**/*.py"]
+timeout = 180
+severity = "blocking"
+variants = []
+finding_exit_codes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+execution_error_exit_codes = [32]
+
+[[gates]]
+id = "python-docstrings"
+phase = "check"
+argv = ["{tool:pydoclint}", "--config", "{python-config:pydoclint}", "{python-paths:pydoclint}"]
+triggers = ["**/*.py"]
+timeout = 180
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "python-dead-code"
+phase = "check"
+argv = ["{tool:vulture}", "--config", "{python-config:vulture}", "{python-paths:pylint}"]
+triggers = ["**/*.py"]
+timeout = 180
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "python-grain"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.grain_adapter", "--config", "{python-config:grain}"]
+triggers = ["**/*.py", "**/*.md", "**/*.markdown"]
+timeout = 180
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "python-structure"
+phase = "check"
+argv = ["{tool:slop}", "lint", "--root", ".", "--config", "{central-config:slop/structural.toml}", "--no-color"]
+triggers = ["**/*.py"]
+timeout = 180
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "ast-grep-universal"
+phase = "check"
+argv = ["{tool:ast-grep}", "scan", "--config", "{central-config:ast-grep/universal/sgconfig.yml}", "--color", "never", "."]
+triggers = ["**"]
+timeout = 120
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "ast-grep-python"
+phase = "check"
+argv = ["{tool:ast-grep}", "scan", "--config", "{central-config:ast-grep/python/sgconfig.yml}", "--color", "never", "."]
+triggers = ["**/*.py"]
+timeout = 120
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "python-tests"
+phase = "sentinel"
+argv = ["{tool:pytest}", "-p", "no:cacheprovider", "--cov", "{python-paths:pylint}", "--cov-config", "{python-config:coverage}", "--cov-report", "term-missing", "--cov-fail-under", "95", "{python-paths:tests}"]
+triggers = ["**"]
+timeout = 600
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2, 3, 4, 5]

@@ -9,16 +9,24 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
+from qa_toolkit.ast_grep import AstGrepPolicyError, resolve_ast_grep
 from qa_toolkit.config import digest_consumer, digest_profile, load_consumer, load_profile
 from qa_toolkit.deployment import DeploymentError, resolve_target, status
 from qa_toolkit.models import ConsumerGate, Gate
 from qa_toolkit.paths import payload_root, toolkit_root
+from qa_toolkit.python_tools import (
+    PythonResolution,
+    PythonToolError,
+    owned_consumer_command,
+    resolve_python,
+)
 from qa_toolkit.registry import executable_path, select_tools
 
 NormalizedResult = Literal["pass", "finding", "execution-error", "not-run"]
@@ -37,6 +45,15 @@ class PlannedGate:
     execution_error_exit_codes: tuple[int, ...]
     execution_owner: str
     rule_source: str
+    environment: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True)
+class ResolvedPlan:
+    """Complete plan and generated configuration identity."""
+
+    gates: tuple[PlannedGate, ...]
+    configuration_digests: dict[str, str]
 
 
 class RunnerError(RuntimeError):
@@ -68,6 +85,8 @@ def _resolve_argument(argument: str, target: Path, root: Path, target_python: Pa
         return str(target_python)
     if argument == "{qat-python}":
         return str(payload_root(root) / "python" / "bin" / "python")
+    if argument == "{toolkit}":
+        return str(root)
     match = re.fullmatch(r"\{tool:([a-z0-9][a-z0-9.-]*)\}", argument)
     if match:
         tool = select_tools([match.group(1)], root)[0]
@@ -80,6 +99,37 @@ def _resolve_argument(argument: str, target: Path, root: Path, target_python: Pa
     return argument
 
 
+def _resolve_arguments(
+    argv: tuple[str, ...],
+    target: Path,
+    root: Path,
+    target_python: Path,
+    python: PythonResolution | None,
+) -> tuple[str, ...]:
+    result: list[str] = []
+    for argument in argv:
+        config = re.fullmatch(r"\{python-config:([a-z-]+)\}", argument)
+        central_config = re.fullmatch(r"\{central-config:([a-z0-9./-]+)\}", argument)
+        paths = re.fullmatch(r"\{python-paths:([a-z-]+)\}", argument)
+        if config is not None:
+            if python is None or config.group(1) not in python.configurations:
+                raise RunnerError(f"unavailable Python configuration: {config.group(1)}")
+            result.append(str(python.configurations[config.group(1)]))
+        elif central_config is not None:
+            selected = (root / "config" / central_config.group(1)).resolve()
+            config_root = (root / "config").resolve()
+            if config_root not in selected.parents or not selected.is_file():
+                raise RunnerError(f"unavailable central configuration: {central_config.group(1)}")
+            result.append(str(selected))
+        elif paths is not None:
+            if python is None or paths.group(1) not in python.paths:
+                raise RunnerError(f"unavailable Python paths: {paths.group(1)}")
+            result.extend(python.paths[paths.group(1)])
+        else:
+            result.append(_resolve_argument(argument, target, root, target_python))
+    return tuple(result)
+
+
 def _planned(
     gate: Gate | ConsumerGate,
     *,
@@ -88,17 +138,20 @@ def _planned(
     target: Path,
     root: Path,
     target_python: Path,
+    python: PythonResolution | None,
+    environment: dict[str, str] | None = None,
 ) -> PlannedGate:
     return PlannedGate(
         identifier=gate.identifier,
         phase=gate.phase,
-        argv=tuple(_resolve_argument(item, target, root, target_python) for item in gate.argv),
+        argv=_resolve_arguments(gate.argv, target, root, target_python, python),
         timeout=gate.timeout,
         severity=gate.severity,
         finding_exit_codes=gate.finding_exit_codes,
         execution_error_exit_codes=gate.execution_error_exit_codes,
         execution_owner=owner,
         rule_source=str(source),
+        environment=tuple(sorted((environment or {}).items())),
     )
 
 
@@ -112,20 +165,64 @@ def resolve_plan(
     changed: tuple[str, ...],
 ) -> tuple[PlannedGate, ...]:
     """Resolve the complete selected order before executing any command."""
+    return _resolve_plan(
+        target,
+        root,
+        mode,
+        variant=variant,
+        include_advisory=include_advisory,
+        changed=changed,
+    ).gates
+
+
+def _resolve_plan(
+    target: Path,
+    root: Path,
+    mode: Literal["check", "sentinel", "advisory"],
+    *,
+    variant: str | None,
+    include_advisory: bool,
+    changed: tuple[str, ...],
+) -> ResolvedPlan:
+    """Resolve commands and bind generated configuration digests."""
     deployment = status(target, root)
     if not deployment["current"]:
         raise RunnerError("repository deployment is stale; run qat repo sync")
     consumer = load_consumer(target)
     profile = load_profile(consumer.profile, root)
-    target_python = _target_python(target, consumer.python_project, root)
+    target_python = _target_python(target, consumer.python.project, root)
+    python = resolve_python(target, root, consumer) if "ruff" in profile.tools else None
+    ast_grep = resolve_ast_grep(consumer, target=target, root=root)
+    selected_bins = tuple(
+        dict.fromkeys(
+            str(executable_path(tool, root).parent) for tool in select_tools(profile.tools, root)
+        )
+    )
+    execution_environment = {} if python is None else dict(python.environment)
+    execution_environment["PATH"] = os.pathsep.join((*selected_bins, os.environ.get("PATH", "")))
+    for consumer_gate in consumer.gates:
+        owned = owned_consumer_command(consumer_gate.argv)
+        registry_id = "import-linter" if owned == "lint-imports" else owned
+        if registry_id is not None and registry_id in profile.tools:
+            raise RunnerError(
+                f"consumer gate {consumer_gate.identifier} conflicts with central ownership "
+                f"of {owned}"
+            )
     phases = ("check",) if mode in {"check", "advisory"} else ("check", "sentinel")
     selected: list[PlannedGate] = []
     seen: set[str] = set()
     for phase in phases:
-        sources: tuple[tuple[Gate | ConsumerGate, str, Path], ...] = tuple(
-            (gate, "central", profile.source) for gate in profile.gates if gate.phase == phase
-        ) + tuple(
-            (gate, "consumer", consumer.source) for gate in consumer.gates if gate.phase == phase
+        dynamic = (() if python is None else python.gates) + ast_grep.gates
+        sources: tuple[tuple[Gate | ConsumerGate, str, Path], ...] = (
+            tuple(
+                (gate, "central", profile.source) for gate in profile.gates if gate.phase == phase
+            )
+            + tuple((gate, "central", consumer.source) for gate in dynamic if gate.phase == phase)
+            + tuple(
+                (gate, "consumer", consumer.source)
+                for gate in consumer.gates
+                if gate.phase == phase
+            )
         )
         for gate, owner, source in sources:
             if gate.identifier in seen:
@@ -147,9 +244,14 @@ def resolve_plan(
                     target=target,
                     root=root,
                     target_python=target_python,
+                    python=python,
+                    environment=execution_environment,
                 )
             )
-    return tuple(selected)
+    digests = {} if python is None else dict(python.digests)
+    if ast_grep.digest is not None:
+        digests["consumer-ast-grep"] = ast_grep.digest
+    return ResolvedPlan(tuple(selected), digests)
 
 
 def _git_facts(repository: Path) -> tuple[str, bool, str]:
@@ -191,7 +293,7 @@ def execute(
     """Execute a resolved plan and retain complete output below the target Git directory."""
     root = (root or toolkit_root()).resolve()
     target = resolve_target(target_value)
-    plan = resolve_plan(
+    resolved = _resolve_plan(
         target,
         root,
         mode,
@@ -199,6 +301,7 @@ def execute(
         include_advisory=include_advisory,
         changed=changed,
     )
+    plan = resolved.gates
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     run_id = f"{timestamp}-{uuid.uuid4().hex[:12]}"
     run_directory = target / ".git" / "qat" / "evidence" / run_id
@@ -224,6 +327,7 @@ def execute(
                 completed = subprocess.run(
                     list(gate.argv),
                     cwd=target,
+                    env={**os.environ, **dict(gate.environment)},
                     check=False,
                     capture_output=True,
                     timeout=gate.timeout,
@@ -254,6 +358,7 @@ def execute(
                 "severity": gate.severity,
                 "execution_owner": gate.execution_owner,
                 "rule_source": gate.rule_source,
+                "environment": dict(gate.environment),
                 "result": result,
                 "exit_code": exit_code,
                 "stdout": stdout_path.name,
@@ -276,6 +381,7 @@ def execute(
         "profile": profile.name,
         "profile_digest": digest_profile(profile),
         "consumer_digest": digest_consumer(consumer),
+        "resolved_configuration_digests": resolved.configuration_digests,
         "planned_order": [gate.identifier for gate in plan],
         "plan": [
             {
@@ -285,6 +391,7 @@ def execute(
                 "severity": gate.severity,
                 "execution_owner": gate.execution_owner,
                 "rule_source": gate.rule_source,
+                "environment": dict(gate.environment),
             }
             for gate in plan
         ],
@@ -302,6 +409,14 @@ def guarded_execute(*args: object, **kwargs: object) -> tuple[int, Path | None]:
     """Convert configuration and planning failures to command exit 2."""
     try:
         return execute(*args, **kwargs)  # type: ignore[arg-type]
-    except (DeploymentError, RunnerError, OSError, subprocess.CalledProcessError) as error:
+    except (
+        AstGrepPolicyError,
+        DeploymentError,
+        PythonToolError,
+        RunnerError,
+        OSError,
+        subprocess.CalledProcessError,
+        tomllib.TOMLDecodeError,
+    ) as error:
         print(f"qat: {error}", file=sys.stderr)
         return 2, None

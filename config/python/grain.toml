@@ -1,0 +1,16 @@
+[grain]
+fail_on = [
+  "OBVIOUS_COMMENT",
+  "VAGUE_TODO",
+]
+warn_only = ["RESTATED_DOCSTRING", "SINGLE_IMPL_ABC"]
+ignore = [
+  "BULLET_PROSE",
+  "GENERIC_VARNAME",
+  "HEDGE_WORD",
+  "NAKED_EXCEPT",
+  "OBVIOUS_HEADER",
+  "TABLE_OVERKILL",
+  "THANKS_OPENER",
+]
+exclude = []

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import tomllib
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal, overload
 
 from qa_toolkit.models import (
@@ -16,6 +17,13 @@ from qa_toolkit.models import (
     Gate,
     Hook,
     Profile,
+    PydoclintSettings,
+    PylintSettings,
+    PythonException,
+    PythonSettings,
+    PythonTool,
+    RuffSettings,
+    RuffThresholds,
     closed_keys,
     relative_path,
     string,
@@ -23,6 +31,10 @@ from qa_toolkit.models import (
 )
 from qa_toolkit.paths import toolkit_root
 from qa_toolkit.registry import load_registry
+
+_RUFF_SELECTOR = re.compile(r"[A-Z]+[0-9]*")
+_PYLINT_RULE = re.compile(r"[a-z][a-z0-9-]*")
+_PYTHON_MODULE = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
 
 
 def _document(path: Path) -> dict[str, Any]:
@@ -50,6 +62,146 @@ def _positive_integer(value: object, context: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
         raise ConfigurationError(f"{context}: expected a positive integer")
     return value
+
+
+def _boolean(value: object, context: str) -> bool:
+    if not isinstance(value, bool):
+        raise ConfigurationError(f"{context}: expected a boolean")
+    return value
+
+
+def _unique_strings(value: object, context: str) -> tuple[str, ...]:
+    values = string_list(value if value is not None else [], context)
+    if len(values) != len(set(values)):
+        raise ConfigurationError(f"{context}: duplicate values")
+    return values
+
+
+def _python_paths(value: object, context: str) -> tuple[str, ...]:
+    paths = _unique_strings(value, context)
+    for item in paths:
+        path = PurePosixPath(item)
+        if (
+            path.is_absolute()
+            or item != path.as_posix()
+            or any(part in {"", ".."} for part in path.parts)
+            or any(character in item for character in "*?[]\\")
+        ):
+            raise ConfigurationError(f"{context}: expected bounded repository paths")
+    return paths
+
+
+def _ruff_settings(value: object, context: str) -> RuffSettings:
+    if not isinstance(value, dict):
+        raise ConfigurationError(f"{context}: expected a table")
+    closed_keys(
+        value,
+        {"extend_select", "enforce", "paths", "known_first_party", "thresholds"},
+        context,
+    )
+    extend = _unique_strings(value.get("extend_select"), f"{context}.extend_select")
+    enforce = _unique_strings(value.get("enforce"), f"{context}.enforce")
+    invalid = [item for item in (*extend, *enforce) if _RUFF_SELECTOR.fullmatch(item) is None]
+    if invalid:
+        raise ConfigurationError(f"{context}: invalid Ruff selectors: {', '.join(invalid)}")
+    modules = _unique_strings(value.get("known_first_party"), f"{context}.known_first_party")
+    invalid_modules = [item for item in modules if _PYTHON_MODULE.fullmatch(item) is None]
+    if invalid_modules:
+        raise ConfigurationError(f"{context}: invalid Python modules: {', '.join(invalid_modules)}")
+    thresholds_raw = value.get("thresholds", {})
+    if not isinstance(thresholds_raw, dict):
+        raise ConfigurationError(f"{context}.thresholds: expected a table")
+    closed_keys(
+        thresholds_raw,
+        {"max_complexity", "max_args", "max_returns"},
+        f"{context}.thresholds",
+    )
+    return RuffSettings(
+        extend_select=extend,
+        enforce=enforce,
+        paths=_python_paths(value.get("paths"), f"{context}.paths"),
+        known_first_party=modules,
+        thresholds=RuffThresholds(
+            **{
+                key: _positive_integer(thresholds_raw[key], f"{context}.thresholds.{key}")
+                if key in thresholds_raw
+                else None
+                for key in ("max_complexity", "max_args", "max_returns")
+            }
+        ),
+    )
+
+
+def _pylint_settings(value: object, context: str) -> PylintSettings:
+    if not isinstance(value, dict):
+        raise ConfigurationError(f"{context}: expected a table")
+    closed_keys(value, {"enable", "paths", "min_similarity_lines"}, context)
+    enabled = _unique_strings(value.get("enable"), f"{context}.enable")
+    invalid = [item for item in enabled if _PYLINT_RULE.fullmatch(item) is None]
+    if invalid:
+        raise ConfigurationError(f"{context}: invalid Pylint rules: {', '.join(invalid)}")
+    return PylintSettings(
+        enable=enabled,
+        paths=_python_paths(value.get("paths"), f"{context}.paths"),
+        min_similarity_lines=(
+            _positive_integer(value["min_similarity_lines"], f"{context}.min_similarity_lines")
+            if "min_similarity_lines" in value
+            else None
+        ),
+    )
+
+
+def _pydoclint_settings(value: object, context: str) -> PydoclintSettings:
+    if not isinstance(value, dict):
+        raise ConfigurationError(f"{context}: expected a table")
+    closed_keys(
+        value,
+        {"paths", "skip_checking_short_docstrings", "check_class_attributes"},
+        context,
+    )
+    return PydoclintSettings(
+        paths=_python_paths(value.get("paths"), f"{context}.paths"),
+        skip_checking_short_docstrings=(
+            _boolean(
+                value["skip_checking_short_docstrings"],
+                f"{context}.skip_checking_short_docstrings",
+            )
+            if "skip_checking_short_docstrings" in value
+            else None
+        ),
+        check_class_attributes=(
+            _boolean(value["check_class_attributes"], f"{context}.check_class_attributes")
+            if "check_class_attributes" in value
+            else None
+        ),
+    )
+
+
+def _python_exceptions(value: object, context: str) -> tuple[PythonException, ...]:
+    entries = _table_array(value, context)
+    result: list[PythonException] = []
+    for index, raw in enumerate(entries):
+        item_context = f"{context}[{index}]"
+        closed_keys(raw, {"tool", "rule", "path", "reason"}, item_context)
+        try:
+            tool = PythonTool(string(raw, "tool", item_context))
+        except ValueError as error:
+            raise ConfigurationError(f"{item_context}.tool: unsupported tool") from error
+        rule = string(raw, "rule", item_context)
+        if _RUFF_SELECTOR.fullmatch(rule) is None:
+            raise ConfigurationError(f"{item_context}.rule: invalid Ruff rule code")
+        path = string(raw, "path", item_context)
+        candidate = PurePosixPath(path)
+        if candidate.is_absolute() or ".." in candidate.parts or "\\" in path:
+            raise ConfigurationError(f"{item_context}.path: expected a bounded repository glob")
+        reason = string(raw, "reason", item_context).strip()
+        if not reason:
+            raise ConfigurationError(f"{item_context}.reason: expected a non-empty reason")
+        result.append(PythonException(tool, rule, path, reason))
+    identities = {(item.tool, item.rule, item.path) for item in result}
+    if len(identities) != len(result):
+        raise ConfigurationError(f"{context}: duplicate tool, rule, and path")
+    return tuple(sorted(result))
 
 
 def _exit_codes(value: object, context: str) -> tuple[int, ...]:
@@ -213,6 +365,8 @@ def _optional_path(value: object, context: str) -> Path | None:
         return None
     if not isinstance(value, str) or not value:
         raise ConfigurationError(f"{context}: expected a non-empty relative path")
+    if value == "." and context.endswith(".python.project"):
+        return Path(".")
     return relative_path(value, context)
 
 
@@ -262,7 +416,22 @@ def load_consumer(target: Path) -> Consumer:
     python = value.get("python", {})
     if not isinstance(python, dict):
         raise ConfigurationError(f"{path}.python: expected a table")
-    closed_keys(python, {"project"}, f"{path}.python")
+    closed_keys(python, {"project", "ruff", "pylint", "pydoclint", "exceptions"}, f"{path}.python")
+    python_settings = PythonSettings(
+        project=_optional_path(python.get("project"), f"{path}.python.project"),
+        ruff=_ruff_settings(python["ruff"], f"{path}.python.ruff") if "ruff" in python else None,
+        pylint=(
+            _pylint_settings(python["pylint"], f"{path}.python.pylint")
+            if "pylint" in python
+            else None
+        ),
+        pydoclint=(
+            _pydoclint_settings(python["pydoclint"], f"{path}.python.pydoclint")
+            if "pydoclint" in python
+            else None
+        ),
+        exceptions=_python_exceptions(python.get("exceptions", []), f"{path}.python.exceptions"),
+    )
 
     gates = tuple(
         _gate(raw, f"{path}.gates[{index}]", consumer=True)
@@ -288,7 +457,7 @@ def load_consumer(target: Path) -> Consumer:
         vocabulary_allowances=allowances,
         ast_grep_config=_optional_path(ast_grep.get("config"), f"{path}.ast_grep.config"),
         ast_grep_tests=_optional_path(ast_grep.get("tests"), f"{path}.ast_grep.tests"),
-        python_project=_optional_path(python.get("project"), f"{path}.python.project"),
+        python=python_settings,
         gates=gates,
         protected_paths=protected,
         work_state_directory=relative_path(
@@ -314,6 +483,11 @@ def digest_consumer(consumer: Consumer) -> str:
             consumer.vocabulary_file,
             consumer.ast_grep_config,
             consumer.ast_grep_tests,
+            (
+                (consumer.python.project or Path(".")) / "pyproject.toml"
+                if (target / (consumer.python.project or Path(".")) / "pyproject.toml").is_file()
+                else None
+            ),
         )
         if path is not None
     )

@@ -1,0 +1,6 @@
+id: github-write-all-permissions
+language: yaml
+rule:
+  pattern: "permissions: write-all"
+message: GitHub Actions workflows must grant explicit least-privilege permissions.
+severity: error
