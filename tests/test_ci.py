@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -11,6 +12,23 @@ ACTION = re.compile(r"^\s*uses:\s+([^\s]+)@([0-9a-f]{40})(?:\s+#.*)?$", re.MULTI
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_gridform_audits_the_installed_product_environment(self) -> None:
+        profile = tomllib.loads((ROOT / "profiles/gridform.toml").read_text(encoding="utf-8"))
+        gate = next(item for item in profile["gates"] if item["id"] == "python-dependencies")
+        self.assertEqual(
+            gate["argv"],
+            [
+                "{tool:pip-audit}",
+                "--path",
+                ".venv/lib/python3.11/site-packages",
+                "--skip-editable",
+                "--cache-dir",
+                ".git/qat/cache/pip-audit",
+                "--progress-spinner",
+                "off",
+            ],
+        )
+
     def test_reusable_workflow_requires_and_verifies_exact_revision(self) -> None:
         path = ROOT / ".github/workflows/reusable-sentinel.yml"
         content = path.read_text(encoding="utf-8")
