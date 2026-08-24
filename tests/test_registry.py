@@ -92,6 +92,34 @@ class TrackedRegistryTests(unittest.TestCase):
                 (root / "toolkit/sample/bin/sample").resolve().read_bytes(), source.read_bytes()
             )
 
+    def test_module_only_python_package_reports_current_without_an_executable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            python = root / "toolkit/python/bin/python"
+            python.parent.mkdir(parents=True)
+            python.write_text("#!/bin/sh\necho 7.1.0\n", encoding="utf-8")
+            python.chmod(0o755)
+            record = _record("https://example.invalid/module", "0" * 64)
+            record.update(
+                {
+                    "id": "pytest-cov",
+                    "environment": "python",
+                    "asset": {
+                        "kind": "uv-lock",
+                        "url": None,
+                        "archive": None,
+                        "executables": [],
+                    },
+                    "version_argv": ["{python}", "-m", "ignored", "pytest-cov"],
+                    "version_contains": "7.1.0",
+                }
+            )
+            _write_registry(root, record)
+
+            current, detail = tool_status(select_tools(["pytest-cov"], root)[0], root)
+
+            self.assertTrue(current, detail)
+
     def test_checksum_failure_leaves_active_installation_untouched(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

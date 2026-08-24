@@ -215,7 +215,8 @@ def tool_status(tool: Tool, root: Path | None = None) -> tuple[bool, str]:
     if tool.environment == "julia":
         return _julia_package_status(tool, repository)
     executable = executable_path(tool, root)
-    if not executable.is_file() or not os.access(executable, os.X_OK):
+    needs_executable = "{executable}" in tool.version_argv
+    if needs_executable and (not executable.is_file() or not os.access(executable, os.X_OK)):
         return False, "missing"
     python = payload_root(root or toolkit_root()) / "python" / "bin" / "python"
     replacements = {"{executable}": str(executable), "{python}": str(python)}
