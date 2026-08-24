@@ -118,6 +118,10 @@ class ExecutionBoundaryTests(unittest.TestCase):
             patch("qa_toolkit.runner.load_profile", return_value=profile),
             patch("qa_toolkit.runner.digest_consumer", return_value="consumer"),
             patch("qa_toolkit.runner.digest_profile", return_value="profile"),
+            patch(
+                "qa_toolkit.runner.toolkit_facts",
+                return_value=("a" * 40, False, "clean"),
+            ),
             patch("qa_toolkit.runner._git_facts", return_value=("a" * 40, False, "clean")),
             patch("qa_toolkit.runner.subprocess.run", side_effect=process),
         )

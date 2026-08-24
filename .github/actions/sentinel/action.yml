@@ -1,0 +1,126 @@
+name: Exact-SHA qa-toolkit Sentinel
+description: Run one repository's qa-toolkit Sentinel from an immutable private action revision.
+
+inputs:
+  toolkit_revision:
+    description: Exact 40-character qa-toolkit action revision
+    required: true
+  target_path:
+    description: Relative path to the checked-out consumer repository
+    required: false
+    default: "."
+  base_sha:
+    description: Optional exact consumer base for commit validation
+    required: false
+    default: ""
+  variant:
+    description: Optional repository profile variant
+    required: false
+    default: ""
+  setup_path:
+    description: Optional tracked executable consumer setup path
+    required: false
+    default: ""
+  retention_days:
+    description: Evidence artifact retention
+    required: false
+    default: "14"
+
+runs:
+  using: composite
+  steps:
+    - name: Bind immutable action source
+      shell: bash
+      env:
+        ACTION_REF: ${{ github.action_ref }}
+        BASE_SHA: ${{ inputs.base_sha }}
+        CONSUMER_SETUP: ${{ inputs.setup_path }}
+        QAT_VARIANT: ${{ inputs.variant }}
+        TARGET_PATH: ${{ inputs.target_path }}
+        TOOLKIT_REVISION: ${{ inputs.toolkit_revision }}
+      run: |
+        test "${#TOOLKIT_REVISION}" -eq 40
+        case "$TOOLKIT_REVISION" in *[!0-9a-f]*) exit 2;; esac
+        test "$ACTION_REF" = "$TOOLKIT_REVISION"
+        if test -n "$BASE_SHA"; then
+          test "${#BASE_SHA}" -eq 40
+          case "$BASE_SHA" in *[!0-9a-f]*) exit 2;; esac
+        fi
+        case "$QAT_VARIANT" in *[!A-Za-z0-9._-]*) exit 2;; esac
+        case "$CONSUMER_SETUP" in
+          "") ;;
+          /*|../*|*/../*|*/..|*\\*) exit 2;;
+        esac
+        case "$TARGET_PATH" in
+          ""|/*|../*|*/../*|*/..|*\\*) exit 2;;
+        esac
+        toolkit_root="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd -P)"
+        target_root="$(git -C "$TARGET_PATH" rev-parse --show-toplevel)"
+        test "$target_root" = "$(cd "$TARGET_PATH" && pwd -P)"
+        printf '%s\n' "$TOOLKIT_REVISION" > "$toolkit_root/.qat-toolkit-revision"
+        printf 'QAT_TOOLKIT_ROOT=%s\n' "$toolkit_root" >> "$GITHUB_ENV"
+        printf 'QAT_TARGET_ROOT=%s\n' "$target_root" >> "$GITHUB_ENV"
+
+    - name: Verify exact revisions
+      shell: bash
+      env:
+        TOOLKIT_REVISION: ${{ inputs.toolkit_revision }}
+      run: |
+        test "$(cat "$QAT_TOOLKIT_ROOT/.qat-toolkit-revision")" = "$TOOLKIT_REVISION"
+        git -C "$QAT_TARGET_ROOT" rev-parse HEAD
+
+    - name: Reconstruct central tools
+      shell: bash
+      run: "$QAT_TOOLKIT_ROOT/bootstrap.sh"
+
+    - name: Enroll consumer locally
+      shell: bash
+      run: |
+        "$QAT_TOOLKIT_ROOT/bin/qat" repo enroll "$QAT_TARGET_ROOT"
+
+    - name: Verify tools and local deployment
+      shell: bash
+      run: |
+        "$QAT_TOOLKIT_ROOT/bin/qat" tool status
+        "$QAT_TOOLKIT_ROOT/bin/qat" repo status "$QAT_TARGET_ROOT"
+        "$QAT_TOOLKIT_ROOT/bin/qat" hook status "$QAT_TARGET_ROOT"
+
+    - name: Prepare consumer runtime
+      if: inputs.setup_path != ''
+      shell: bash
+      env:
+        CONSUMER_SETUP: ${{ inputs.setup_path }}
+      run: |
+        git -C "$QAT_TARGET_ROOT" ls-files --error-unmatch -- "$CONSUMER_SETUP"
+        test -f "$QAT_TARGET_ROOT/$CONSUMER_SETUP"
+        test -x "$QAT_TARGET_ROOT/$CONSUMER_SETUP"
+        "$QAT_TARGET_ROOT/$CONSUMER_SETUP"
+
+    - name: Validate consumer commits
+      if: inputs.base_sha != ''
+      shell: bash
+      env:
+        BASE_SHA: ${{ inputs.base_sha }}
+      run: |
+        "$QAT_TOOLKIT_ROOT/bin/qat" commits --target "$QAT_TARGET_ROOT" --range "$BASE_SHA..HEAD"
+
+    - name: Run Sentinel once
+      shell: bash
+      env:
+        QAT_VARIANT: ${{ inputs.variant }}
+      run: |
+        if test -n "$QAT_VARIANT"; then
+          "$QAT_TOOLKIT_ROOT/bin/qat" sentinel --target "$QAT_TARGET_ROOT" --variant "$QAT_VARIANT"
+        else
+          "$QAT_TOOLKIT_ROOT/bin/qat" sentinel --target "$QAT_TARGET_ROOT"
+        fi
+
+    - name: Upload complete evidence
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: qa-toolkit-evidence-${{ github.run_attempt }}
+        path: ${{ inputs.target_path }}/.git/qat/evidence
+        if-no-files-found: warn
+        include-hidden-files: true
+        retention-days: ${{ inputs.retention_days }}

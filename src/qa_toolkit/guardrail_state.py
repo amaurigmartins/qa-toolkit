@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from qa_toolkit import source_identity
 from qa_toolkit.config import digest_consumer, digest_profile, load_consumer, load_profile
 from qa_toolkit.deployment import DeploymentError, git_bytes
 from qa_toolkit.filesystem import atomic_bytes
@@ -26,9 +27,12 @@ def _git(repository: Path, *arguments: str) -> bytes:
 def identity(target: Path, root: Path) -> dict[str, object]:
     """Return the exact current toolkit, target, worktree, and profile identity."""
     target_revision = _git(target, "rev-parse", "HEAD").decode().strip()
-    toolkit_revision = _git(root, "rev-parse", "HEAD").decode().strip()
-    if len(target_revision) != 40 or len(toolkit_revision) != 40:
+    if len(target_revision) != 40:
         raise GuardrailStateError("guardrail identity requires exact Git revisions")
+    try:
+        toolkit_revision = source_identity.toolkit_revision(root)
+    except source_identity.SourceIdentityError as error:
+        raise GuardrailStateError(str(error)) from error
     status = _git(target, "status", "--porcelain=v1", "-z", "--untracked-files=all")
     consumer = load_consumer(target)
     profile = load_profile(consumer.profile, root)

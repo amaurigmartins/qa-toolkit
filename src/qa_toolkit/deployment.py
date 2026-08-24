@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from qa_toolkit import source_identity
 from qa_toolkit.config import digest_consumer, digest_profile, load_consumer, load_profile
 from qa_toolkit.filesystem import atomic_bytes
 from qa_toolkit.hook_deployment import (
@@ -154,6 +155,13 @@ def _revision(repository: Path) -> str:
     if len(value) != 40:
         raise DeploymentError(f"cannot resolve exact revision for {repository}")
     return value
+
+
+def _toolkit_revision(repository: Path) -> str:
+    try:
+        return source_identity.toolkit_revision(repository)
+    except source_identity.SourceIdentityError as error:
+        raise DeploymentError(str(error)) from error
 
 
 def _state(target: Path) -> Path:
@@ -501,7 +509,7 @@ def enroll(
         record = {
             "schema_version": 1,
             "toolkit_root": str(root),
-            "toolkit_revision": _revision(root),
+            "toolkit_revision": _toolkit_revision(root),
             "target_root": str(target),
             "target_revision": _revision(target),
             "profile": profile.name,
@@ -611,7 +619,7 @@ def status(target_value: Path, root: Path | None = None) -> dict[str, Any]:
         current = False
     profile_current = record["profile_digest"] == digest_profile(profile)
     consumer_current = record["consumer_digest"] == digest_consumer(consumer)
-    toolkit_current = record["toolkit_revision"] == _revision(root)
+    toolkit_current = record["toolkit_revision"] == _toolkit_revision(root)
     return {
         "enrolled": True,
         "current": current and profile_current and consumer_current and toolkit_current,
@@ -785,7 +793,7 @@ def sync(
     record = {
         **old,
         "toolkit_root": str(root),
-        "toolkit_revision": _revision(root),
+        "toolkit_revision": _toolkit_revision(root),
         "target_revision": _revision(target),
         "profile": profile.name,
         "profile_digest": digest_profile(profile),
