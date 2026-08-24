@@ -6,8 +6,9 @@ tools = [
   "pytest-cov", "pylint", "vulture", "import-linter", "pydoclint", "grain", "slop", "pip-audit",
 ]
 configurations = []
-hooks = []
 skills = []
+hooks = []
+
 
 [[gates]]
 id = "python-format"

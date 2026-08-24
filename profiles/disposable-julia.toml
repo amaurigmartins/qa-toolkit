@@ -6,8 +6,9 @@ tools = [
   "julia-1.12.6", "juliaformatter", "aqua", "explicitimports",
 ]
 configurations = []
-hooks = []
 skills = []
+hooks = []
+
 
 [[gates]]
 id = "julia-source"

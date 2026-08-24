@@ -10,6 +10,7 @@ from pathlib import Path
 
 from qa_toolkit.config import profile_summary
 from qa_toolkit.deployment import DeploymentError, enroll, status, sync, unenroll, validate_profile
+from qa_toolkit.hook_deployment import HookDeploymentError
 from qa_toolkit.models import ConfigurationError
 
 
@@ -21,9 +22,12 @@ def _parser() -> argparse.ArgumentParser:
     for operation in ("enroll", "status"):
         command = subparsers.add_parser(operation)
         command.add_argument("target", type=Path)
+        if operation == "enroll":
+            command.add_argument("--adopt-hooks", action="store_true")
     sync_parser = subparsers.add_parser("sync")
     sync_parser.add_argument("target", type=Path)
     sync_parser.add_argument("--hard-reset", action="store_true")
+    sync_parser.add_argument("--adopt-hooks", action="store_true")
     unenroll_parser = subparsers.add_parser("unenroll")
     unenroll_parser.add_argument("target", type=Path)
     unenroll_parser.add_argument("--backup", type=Path)
@@ -39,9 +43,23 @@ def main(arguments: Sequence[str] | None = None) -> None:
         if options.operation == "profile-validate":
             print(profile_summary(validate_profile(options.profile)))
         elif options.operation == "enroll":
-            print(json.dumps(enroll(options.target), sort_keys=True))
+            print(
+                json.dumps(
+                    enroll(options.target, adopt_hooks=options.adopt_hooks),
+                    sort_keys=True,
+                )
+            )
         elif options.operation == "sync":
-            print(json.dumps(sync(options.target, hard_reset=options.hard_reset), sort_keys=True))
+            print(
+                json.dumps(
+                    sync(
+                        options.target,
+                        hard_reset=options.hard_reset,
+                        adopt_hooks=options.adopt_hooks,
+                    ),
+                    sort_keys=True,
+                )
+            )
         elif options.operation == "status":
             result = status(options.target)
             print(json.dumps(result, sort_keys=True))
@@ -54,7 +72,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
                 hard_reset=options.hard_reset,
                 purge_config=options.purge_config,
             )
-    except (DeploymentError, ConfigurationError) as error:
+    except (DeploymentError, HookDeploymentError, ConfigurationError) as error:
         print(f"qat-{options.operation}: {error}", file=sys.stderr)
         raise SystemExit(2) from error
 

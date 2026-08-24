@@ -7,11 +7,17 @@ import json
 import os
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Any
 
 from qa_toolkit.config import digest_consumer, digest_profile, load_consumer, load_profile
+from qa_toolkit.filesystem import atomic_bytes
+from qa_toolkit.hook_deployment import (
+    HookDeploymentError,
+    hook_status,
+    reconcile_hooks,
+    remove_hooks,
+)
 from qa_toolkit.models import ConfigurationError, ConfigurationLink, Consumer, Profile
 from qa_toolkit.paths import toolkit_root
 
@@ -39,6 +45,20 @@ def _git(
     return result
 
 
+def git_bytes(target: Path, *arguments: str) -> bytes:
+    """Run one bounded Git inspection and return its raw output."""
+    try:
+        return subprocess.run(
+            ["git", "-C", str(target), *arguments],
+            check=True,
+            capture_output=True,
+            timeout=30,
+            shell=False,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise DeploymentError(f"Git inspection failed: {error}") from error
+
+
 def resolve_target(value: Path) -> Path:
     """Resolve one ordinary Git worktree root."""
     target = Path(_git(value.resolve(), ["rev-parse", "--show-toplevel"]).stdout.strip()).resolve()
@@ -50,17 +70,11 @@ def resolve_target(value: Path) -> Path:
 def tracked_entries(target: Path) -> tuple[tuple[str, str], ...]:
     """Return tracked Git modes and paths without interpreting shell text."""
     try:
-        completed = subprocess.run(
-            ["git", "-C", str(target), "ls-files", "--cached", "--stage", "-z"],
-            check=True,
-            capture_output=True,
-            timeout=30,
-            shell=False,
-        )
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        output = git_bytes(target, "ls-files", "--cached", "--stage", "-z")
+    except DeploymentError as error:
         raise DeploymentError(f"cannot list tracked repository inputs: {error}") from error
     result: list[tuple[str, str]] = []
-    for record in completed.stdout.split(b"\0"):
+    for record in output.split(b"\0"):
         if not record:
             continue
         metadata, raw_path = record.split(b"\t", maxsplit=1)
@@ -87,7 +101,7 @@ def _tracked(target: Path, path: Path) -> bool:
 
 
 def _validate_consumer_paths(target: Path, consumer: Consumer) -> None:
-    paths = [Path(".qat.toml"), *consumer.native_configurations, *consumer.protected_paths]
+    paths = [Path(".qat.toml"), *consumer.native_configurations]
     paths.extend(
         path
         for path in (
@@ -136,38 +150,71 @@ def _record_path(target: Path) -> Path:
     return _state(target) / "deployment.json"
 
 
-def _atomic_bytes(path: Path, content: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    temporary = Path(temporary_name)
-    try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    finally:
-        if temporary.exists():
-            temporary.unlink()
-
-
 def _atomic_text(path: Path, content: str) -> None:
-    _atomic_bytes(path, content.encode())
+    atomic_bytes(path, content.encode())
 
 
 def _relative_link(source: Path, destination: Path) -> str:
     return os.path.relpath(source, destination.parent)
 
 
-def _exclude(target: Path) -> tuple[str, str, bool]:
+def _exclude(target: Path, required: tuple[str, ...]) -> dict[str, Any]:
     path = target / ".git" / "info" / "exclude"
     before = path.read_text(encoding="utf-8") if path.exists() else ""
-    if ".qat/" in before.splitlines():
-        return before, before, False
-    separator = "" if not before or before.endswith("\n") else "\n"
-    after = f"{before}{separator}.qat/\n"
+    existing = set(before.splitlines())
+    owned = tuple(line for line in required if line not in existing)
+    after = before
+    for line in owned:
+        separator = "" if not after or after.endswith("\n") else "\n"
+        after = f"{after}{separator}{line}\n"
     _atomic_text(path, after)
-    return before, after, True
+    return {
+        "path": ".git/info/exclude",
+        "lines": list(required),
+        "owned": list(owned),
+        "before": before,
+        "after": after,
+    }
+
+
+def _exclude_lines(profile: Profile) -> tuple[str, ...]:
+    lines = [".qat/"]
+    if any(hook.kind == "codex" for hook in profile.hooks):
+        lines.extend((".codex/hooks.json", ".codex/hooks/"))
+    return tuple(lines)
+
+
+def _reconcile_exclude(
+    target: Path, previous: dict[str, Any], required: tuple[str, ...]
+) -> dict[str, Any]:
+    path = target / ".git" / "info" / "exclude"
+    current = path.read_text(encoding="utf-8") if path.exists() else ""
+    old_owned = previous.get("owned", [])
+    if isinstance(old_owned, bool):
+        old_owned = [previous.get("line", ".qat/")] if old_owned else []
+    owned = [str(line) for line in old_owned]
+    lines = current.splitlines(keepends=True)
+    for line in tuple(owned):
+        if line not in required:
+            lines = [item for item in lines if item.rstrip("\r\n") != line]
+            owned.remove(line)
+    current = "".join(lines)
+    present = set(current.splitlines())
+    for line in required:
+        if line in present:
+            continue
+        separator = "" if not current or current.endswith("\n") else "\n"
+        current = f"{current}{separator}{line}\n"
+        owned.append(line)
+        present.add(line)
+    _atomic_text(path, current)
+    return {
+        "path": ".git/info/exclude",
+        "lines": list(required),
+        "owned": owned,
+        "before": previous.get("before", ""),
+        "after": current,
+    }
 
 
 def _deploy_configuration(
@@ -189,9 +236,9 @@ def _deploy_configuration(
             "digest": _digest(source),
         }
     content = source.read_bytes()
-    _atomic_bytes(destination, content)
+    atomic_bytes(destination, content)
     base = base_directory / configuration.identifier
-    _atomic_bytes(base, content)
+    atomic_bytes(base, content)
     return {
         "id": configuration.identifier,
         "path": configuration.destination.as_posix(),
@@ -203,7 +250,12 @@ def _deploy_configuration(
     }
 
 
-def enroll(target_value: Path, root: Path | None = None) -> dict[str, Any]:
+def enroll(
+    target_value: Path,
+    root: Path | None = None,
+    *,
+    adopt_hooks: bool = False,
+) -> dict[str, Any]:
     """Deploy the selected profile into one repository."""
     root = (root or toolkit_root()).resolve()
     target = resolve_target(target_value)
@@ -220,11 +272,13 @@ def enroll(target_value: Path, root: Path | None = None) -> dict[str, Any]:
     state = _state(target)
     base_directory = state / "base"
     base_directory.mkdir(parents=True, exist_ok=True)
-    exclude_before, exclude_after, exclude_owned = _exclude(target)
+    exclude = _exclude(target, _exclude_lines(profile))
     owned: list[dict[str, Any]] = []
+    hooks: dict[str, Any] = {}
     try:
         for configuration in profile.configurations:
             owned.append(_deploy_configuration(root, target, configuration, base_directory))
+        hooks = reconcile_hooks(target, root, profile, adopt=adopt_hooks)
         record = {
             "schema_version": 1,
             "toolkit_root": str(root),
@@ -235,23 +289,20 @@ def enroll(target_value: Path, root: Path | None = None) -> dict[str, Any]:
             "profile_digest": digest_profile(profile),
             "consumer_digest": digest_consumer(consumer),
             "owned": owned,
-            "exclude": {
-                "path": ".git/info/exclude",
-                "line": ".qat/",
-                "owned": exclude_owned,
-                "before": exclude_before,
-                "after": exclude_after,
-            },
+            "hooks": hooks,
+            "exclude": exclude,
         }
         _atomic_text(_record_path(target), f"{json.dumps(record, indent=2, sort_keys=True)}\n")
         return record
     except Exception:
+        if hooks:
+            remove_hooks(target, hooks, backup=None, hard_reset=True)
         for item in reversed(owned):
             path = target / item["path"]
             if path.exists() or path.is_symlink():
                 path.unlink()
-        if exclude_owned:
-            _atomic_text(target / ".git/info/exclude", exclude_before)
+        if exclude["owned"]:
+            _atomic_text(target / ".git/info/exclude", str(exclude["before"]))
         if state.exists():
             shutil.rmtree(state)
         raise
@@ -305,6 +356,8 @@ def status(target_value: Path, root: Path | None = None) -> dict[str, Any]:
             detail = "central-source-changed"
         paths.append({"path": item["path"], "current": valid, "detail": detail})
         current = current and valid
+    hooks = hook_status(target, root, record.get("hooks", {}))
+    current = current and hooks["current"]
     profile_current = record["profile_digest"] == digest_profile(profile)
     consumer_current = record["consumer_digest"] == digest_consumer(consumer)
     toolkit_current = record["toolkit_revision"] == _revision(root)
@@ -316,6 +369,7 @@ def status(target_value: Path, root: Path | None = None) -> dict[str, Any]:
         "consumer_current": consumer_current,
         "toolkit_current": toolkit_current,
         "paths": paths,
+        "hooks": hooks,
     }
 
 
@@ -343,7 +397,11 @@ def _merge_copy(local: bytes, base: bytes, incoming: bytes, directory: Path) -> 
 
 
 def sync(
-    target_value: Path, root: Path | None = None, *, hard_reset: bool = False
+    target_value: Path,
+    root: Path | None = None,
+    *,
+    hard_reset: bool = False,
+    adopt_hooks: bool = False,
 ) -> dict[str, Any]:
     """Reconcile managed paths without rewriting native consumer configuration."""
     root = (root or toolkit_root()).resolve()
@@ -442,9 +500,19 @@ def sync(
             destination.symlink_to(str(value))
         else:
             content = value if isinstance(value, bytes) else value.encode()
-            _atomic_bytes(destination, content)
+            atomic_bytes(destination, content)
             central = (root / new_by_path[path_string].source).read_bytes()
-            _atomic_bytes(_state(target) / "base" / identifier, central)
+            atomic_bytes(_state(target) / "base" / identifier, central)
+
+    hooks = reconcile_hooks(
+        target,
+        root,
+        profile,
+        previous=old.get("hooks", {}),
+        adopt=adopt_hooks,
+        hard_reset=hard_reset,
+    )
+    exclude = _reconcile_exclude(target, old["exclude"], _exclude_lines(profile))
 
     record = {
         **old,
@@ -455,6 +523,8 @@ def sync(
         "profile_digest": digest_profile(profile),
         "consumer_digest": digest_consumer(consumer),
         "owned": [next_records[path] for path in new_by_path],
+        "hooks": hooks,
+        "exclude": exclude,
     }
     _atomic_text(_record_path(target), f"{json.dumps(record, indent=2, sort_keys=True)}\n")
     return record
@@ -501,6 +571,16 @@ def unenroll(
         for path in modified:
             _backup_path(target, path, backup)
 
+    try:
+        remove_hooks(
+            target,
+            record.get("hooks", {}),
+            backup=backup,
+            hard_reset=hard_reset,
+        )
+    except HookDeploymentError as error:
+        raise DeploymentError(str(error)) from error
+
     for item in reversed(record["owned"]):
         path = target / item["path"]
         if path.exists() or path.is_symlink():
@@ -515,14 +595,14 @@ def unenroll(
 
     exclude = record["exclude"]
     exclude_path = target / exclude["path"]
-    if exclude["owned"]:
+    owned_excludes = exclude.get("owned", [])
+    if isinstance(owned_excludes, bool):
+        owned_excludes = [exclude.get("line", ".qat/")] if owned_excludes else []
+    if owned_excludes:
         current = exclude_path.read_text(encoding="utf-8") if exclude_path.exists() else ""
-        if current == exclude["after"]:
-            _atomic_text(exclude_path, exclude["before"])
-        else:
-            lines = current.splitlines(keepends=True)
-            remaining = [line for line in lines if line.rstrip("\r\n") != exclude["line"]]
-            _atomic_text(exclude_path, "".join(remaining))
+        lines = current.splitlines(keepends=True)
+        remaining = [line for line in lines if line.rstrip("\r\n") not in set(owned_excludes)]
+        _atomic_text(exclude_path, "".join(remaining))
     shutil.rmtree(_state(target))
 
 

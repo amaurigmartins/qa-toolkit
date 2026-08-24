@@ -1,0 +1,60 @@
+schema_version = 1
+name = "disposable-hooks"
+tools = ["cocogitto", "python"]
+configurations = []
+gates = []
+skills = []
+
+[[hooks]]
+kind = "git"
+event = "pre-commit"
+entry = "library/git-hooks/pre-commit/quality"
+enabled = true
+
+[[hooks]]
+kind = "git"
+event = "commit-msg"
+entry = "library/git-hooks/commit-msg/commit-message"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "SessionStart"
+entry = "library/codex-hooks/SessionStart/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PreToolUse"
+entry = "library/codex-hooks/PreToolUse/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PermissionRequest"
+entry = "library/codex-hooks/PermissionRequest/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PostToolUse"
+entry = "library/codex-hooks/PostToolUse/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PostToolUse"
+entry = "library/codex-hooks/PostToolUse/fast-check"
+enabled = false
+
+[[hooks]]
+kind = "codex"
+event = "Stop"
+entry = "library/codex-hooks/Stop/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "SessionEnd"
+entry = "library/codex-hooks/SessionEnd/guardrail"
+enabled = true

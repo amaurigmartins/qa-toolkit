@@ -19,6 +19,7 @@ from typing import Literal
 from qa_toolkit.ast_grep import AstGrepPolicyError, resolve_ast_grep
 from qa_toolkit.config import digest_consumer, digest_profile, load_consumer, load_profile
 from qa_toolkit.deployment import DeploymentError, resolve_target, status
+from qa_toolkit.guardrail_state import GuardrailStateError, identity, record_proof
 from qa_toolkit.models import ConsumerGate, Gate
 from qa_toolkit.paths import payload_root, toolkit_root
 from qa_toolkit.python_tools import (
@@ -317,6 +318,7 @@ def execute(
     profile = load_profile(consumer.profile, root)
     toolkit_revision, toolkit_dirty, toolkit_fingerprint = _git_facts(root)
     target_revision, target_dirty, target_fingerprint = _git_facts(target)
+    sentinel_identity = identity(target, root) if mode == "sentinel" else None
     results: list[dict[str, object]] = []
     blocking_finding = False
     execution_error = False
@@ -374,6 +376,10 @@ def execute(
             }
         )
     exit_code = 2 if execution_error else 1 if blocking_finding else 0
+    proof_error = None
+    if mode == "sentinel" and exit_code == 0 and identity(target, root) != sentinel_identity:
+        exit_code = 2
+        proof_error = "repository identity changed while Sentinel was running"
     summary = {
         "schema_version": 1,
         "run_id": run_id,
@@ -406,10 +412,21 @@ def execute(
         ],
         "results": results,
         "exit_code": exit_code,
+        "proof_error": proof_error,
     }
-    (run_directory / "summary.json").write_text(
-        f"{json.dumps(summary, indent=2, sort_keys=True)}\n", encoding="utf-8"
-    )
+    summary_path = run_directory / "summary.json"
+    summary_path.write_text(f"{json.dumps(summary, indent=2, sort_keys=True)}\n", encoding="utf-8")
+    if mode == "sentinel" and exit_code == 0:
+        try:
+            record_proof(target, root, run_directory)
+        except (GuardrailStateError, OSError, ValueError) as error:
+            exit_code = 2
+            summary["exit_code"] = exit_code
+            summary["proof_error"] = f"cannot retain Sentinel proof: {error}"
+            summary_path.write_text(
+                f"{json.dumps(summary, indent=2, sort_keys=True)}\n",
+                encoding="utf-8",
+            )
     print(f"evidence: {run_directory}")
     return exit_code, run_directory
 
@@ -421,6 +438,7 @@ def guarded_execute(*args: object, **kwargs: object) -> tuple[int, Path | None]:
     except (
         AstGrepPolicyError,
         DeploymentError,
+        GuardrailStateError,
         PythonToolError,
         RunnerError,
         OSError,

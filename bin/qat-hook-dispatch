@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+SELF=$(readlink -f -- "$0")
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$SELF")/.." && pwd)
+PYTHON=${QAT_PYTHON:-"$ROOT/toolkit/python/bin/python"}
+[ -x "$PYTHON" ] || PYTHON=python3
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$ROOT/src" exec "$PYTHON" -m qa_toolkit.hook_cli dispatch --invoked-as "$0" -- "$@"

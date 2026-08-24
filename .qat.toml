@@ -1,7 +1,14 @@
 schema_version = 1
 profile = "qa-toolkit"
 native_configurations = ["pyproject.toml"]
-protected_paths = ["registry/tools.json", "profiles/qa-toolkit.toml"]
+protected_paths = [
+  "registry/tools.json",
+  "profiles/qa-toolkit.toml",
+  "corpus/vocabulary.toml",
+  "library/**",
+  "bin/**",
+  ".github/workflows/**",
+]
 
 [vocabulary]
 additions = []
@@ -10,4 +17,3 @@ allowances = []
 [work]
 state_directory = ".git/qat/work"
 require_allowed_paths = true
-

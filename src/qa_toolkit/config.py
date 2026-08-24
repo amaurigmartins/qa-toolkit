@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import tomllib
 from pathlib import Path, PurePosixPath
@@ -35,6 +36,10 @@ from qa_toolkit.registry import load_registry
 _RUFF_SELECTOR = re.compile(r"[A-Z]+[0-9]*")
 _PYLINT_RULE = re.compile(r"[a-z][a-z0-9-]*")
 _PYTHON_MODULE = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
+_GIT_HOOK_EVENTS = frozenset({"commit-msg", "pre-commit", "pre-push"})
+_CODEX_HOOK_EVENTS = frozenset(
+    {"SessionStart", "PreToolUse", "PermissionRequest", "PostToolUse", "Stop", "SessionEnd"}
+)
 
 
 def _document(path: Path) -> dict[str, Any]:
@@ -340,14 +345,30 @@ def load_profile(name: str, root: Path | None = None) -> Profile:
     hooks: list[Hook] = []
     for index, raw in enumerate(_table_array(value.get("hooks"), f"{path}.hooks")):
         context = f"{path}.hooks[{index}]"
-        closed_keys(raw, {"kind", "event", "entry"}, context)
+        closed_keys(raw, {"kind", "event", "entry", "enabled"}, context)
         kind = string(raw, "kind", context)
         if kind not in {"git", "codex"}:
             raise ConfigurationError(f"{context}.kind: expected git or codex")
+        event = string(raw, "event", context)
+        events = _GIT_HOOK_EVENTS if kind == "git" else _CODEX_HOOK_EVENTS
+        if event not in events:
+            raise ConfigurationError(f"{context}.event: unsupported {kind} event")
         entry = relative_path(string(raw, "entry", context), f"{context}.entry")
-        if not (repository / entry).is_file():
+        expected = Path("library") / f"{kind}-hooks" / event
+        if expected not in entry.parents:
+            raise ConfigurationError(
+                f"{context}.entry: expected a script below {expected.as_posix()}"
+            )
+        source = repository / entry
+        if not source.is_file() or source.is_symlink():
             raise ConfigurationError(f"{context}.entry: central hook does not exist")
-        hooks.append(Hook(kind, string(raw, "event", context), entry))
+        if not os.access(source, os.X_OK):
+            raise ConfigurationError(f"{context}.entry: central hook is not executable")
+        enabled = _boolean(raw.get("enabled", True), f"{context}.enabled")
+        hooks.append(Hook(kind, event, entry, enabled))
+    hook_ids = [(item.kind, item.event, item.entry.name) for item in hooks]
+    if len(hook_ids) != len(set(hook_ids)):
+        raise ConfigurationError(f"{path}.hooks: duplicate kind, event, and entry name")
 
     skills = tuple(
         relative_path(item, f"{path}.skills")

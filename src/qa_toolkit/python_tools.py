@@ -322,7 +322,15 @@ def _python_environment(target: Path, consumer: Consumer) -> dict[str, str]:
     paths = [project, project / "src"]
     for root in (project / ".venv", target / ".venv"):
         paths.extend(sorted(root.glob("lib/python*/site-packages")))
-    return {"PYTHONPATH": os.pathsep.join(str(path) for path in paths if path.exists())}
+    cache = target / ".git" / "qat" / "cache"
+    (cache / "coverage").mkdir(parents=True, exist_ok=True)
+    (cache / "pylint").mkdir(parents=True, exist_ok=True)
+    return {
+        "COVERAGE_FILE": str(cache / "coverage" / ".coverage"),
+        "PYLINTHOME": str(cache / "pylint"),
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": os.pathsep.join(str(path) for path in paths if path.exists()),
+    }
 
 
 def resolve_python(target: Path, root: Path, consumer: Consumer) -> PythonResolution:

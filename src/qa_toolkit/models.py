@@ -139,6 +139,7 @@ class Hook:
     kind: str
     event: str
     entry: Path
+    enabled: bool
 
 
 @dataclass(frozen=True)

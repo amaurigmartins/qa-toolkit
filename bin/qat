@@ -9,4 +9,4 @@ if [ ! -x "$PYTHON" ]; then
     PYTHON=python3
 fi
 
-exec "$PYTHON" "$REPOSITORY/src/qa_toolkit/dispatch.py" "$@"
+PYTHONDONTWRITEBYTECODE=1 exec "$PYTHON" "$REPOSITORY/src/qa_toolkit/dispatch.py" "$@"

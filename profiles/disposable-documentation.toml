@@ -3,6 +3,5 @@ name = "disposable-documentation"
 tools = ["gitleaks", "cocogitto", "vale", "node", "cspell", "python", "grain", "slop"]
 configurations = []
 gates = []
-hooks = []
 skills = []
-
+hooks = []
