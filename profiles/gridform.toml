@@ -1,0 +1,13 @@
+schema_version = 1
+name = "gridform"
+tools = [
+  "uv", "gitleaks", "cocogitto", "jq", "yq", "prek", "fd", "ripgrep", "shellcheck",
+  "actionlint", "osv-scanner", "zizmor", "ast-grep", "vale", "node", "cspell", "python",
+  "ruff", "mypy", "pytest", "coverage", "pytest-cov", "pylint", "vulture", "import-linter",
+  "pydoclint", "grain", "slop", "pip-audit", "gh",
+]
+configurations = []
+gates = []
+hooks = []
+skills = []
+

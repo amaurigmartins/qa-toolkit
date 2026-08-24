@@ -1,0 +1,277 @@
+"""Load explicit toolkit profiles and consumer declarations."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import tomllib
+from pathlib import Path
+from typing import Any, Literal, overload
+
+from qa_toolkit.models import (
+    ConfigurationError,
+    ConfigurationLink,
+    Consumer,
+    ConsumerGate,
+    Gate,
+    Hook,
+    Profile,
+    closed_keys,
+    relative_path,
+    string,
+    string_list,
+)
+from qa_toolkit.paths import toolkit_root
+from qa_toolkit.registry import load_registry
+
+
+def _document(path: Path) -> dict[str, Any]:
+    try:
+        value = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise ConfigurationError(f"cannot read {path}: {error}") from error
+    if not isinstance(value, dict):
+        raise ConfigurationError(f"{path}: expected a table")
+    return value
+
+
+def _schema(value: dict[str, Any], path: Path) -> None:
+    if value.get("schema_version") != 1:
+        raise ConfigurationError(f"{path}: schema_version must be 1")
+
+
+def _table_array(value: object, context: str) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise ConfigurationError(f"{context}: expected an array of tables")
+    return value
+
+
+def _positive_integer(value: object, context: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise ConfigurationError(f"{context}: expected a positive integer")
+    return value
+
+
+@overload
+def _gate(raw: dict[str, Any], context: str, *, consumer: Literal[True]) -> ConsumerGate: ...
+
+
+@overload
+def _gate(raw: dict[str, Any], context: str, *, consumer: Literal[False]) -> Gate: ...
+
+
+def _gate(raw: dict[str, Any], context: str, *, consumer: bool) -> Gate | ConsumerGate:
+    closed_keys(
+        raw,
+        {"id", "phase", "argv", "triggers", "timeout", "severity", "variants"},
+        context,
+    )
+    phase = string(raw, "phase", context)
+    if phase not in {"check", "sentinel"}:
+        raise ConfigurationError(f"{context}.phase: expected check or sentinel")
+    severity = string(raw, "severity", context)
+    if severity not in {"blocking", "advisory"}:
+        raise ConfigurationError(f"{context}.severity: expected blocking or advisory")
+    identifier = string(raw, "id", context)
+    argv = string_list(raw.get("argv"), f"{context}.argv")
+    triggers = string_list(raw.get("triggers"), f"{context}.triggers")
+    timeout = _positive_integer(raw.get("timeout"), f"{context}.timeout")
+    variants = string_list(raw.get("variants"), f"{context}.variants")
+    if consumer:
+        return ConsumerGate(identifier, phase, argv, triggers, timeout, severity, variants)
+    return Gate(identifier, phase, argv, triggers, timeout, severity, variants)
+
+
+def load_profile(name: str, root: Path | None = None) -> Profile:
+    """Load one closed, explicit repository profile."""
+    repository = root or toolkit_root()
+    path = repository / "profiles" / f"{name}.toml"
+    value = _document(path)
+    _schema(value, path)
+    closed_keys(
+        value,
+        {"schema_version", "name", "tools", "configurations", "gates", "hooks", "skills"},
+        str(path),
+    )
+    declared_name = string(value, "name", str(path))
+    if declared_name != name:
+        raise ConfigurationError(f"{path}: name must match the file name")
+    tools = string_list(value.get("tools"), f"{path}.tools")
+    if len(tools) != len(set(tools)):
+        raise ConfigurationError(f"{path}.tools: duplicate tool ID")
+    known_tools = {tool.tool_id for tool in load_registry(repository)}
+    unknown_tools = set(tools) - known_tools
+    if unknown_tools:
+        raise ConfigurationError(f"{path}.tools: unknown tools: {', '.join(sorted(unknown_tools))}")
+
+    configurations: list[ConfigurationLink] = []
+    for index, raw in enumerate(
+        _table_array(value.get("configurations"), f"{path}.configurations")
+    ):
+        context = f"{path}.configurations[{index}]"
+        closed_keys(raw, {"id", "source", "destination", "mode"}, context)
+        mode = string(raw, "mode", context)
+        if mode not in {"symlink", "copy"}:
+            raise ConfigurationError(f"{context}.mode: expected symlink or copy")
+        source = relative_path(string(raw, "source", context), f"{context}.source")
+        destination = relative_path(string(raw, "destination", context), f"{context}.destination")
+        if destination.parts[0] != ".qat":
+            raise ConfigurationError(f"{context}.destination: managed configuration must use .qat/")
+        if not (repository / source).is_file():
+            raise ConfigurationError(f"{context}.source: central file does not exist")
+        configurations.append(
+            ConfigurationLink(string(raw, "id", context), source, destination, mode)
+        )
+    identifiers = [item.identifier for item in configurations]
+    if len(identifiers) != len(set(identifiers)):
+        raise ConfigurationError(f"{path}.configurations: duplicate ID")
+    destinations = [item.destination for item in configurations]
+    if len(destinations) != len(set(destinations)):
+        raise ConfigurationError(f"{path}.configurations: duplicate destination")
+
+    gates = tuple(
+        _gate(raw, f"{path}.gates[{index}]", consumer=False)
+        for index, raw in enumerate(_table_array(value.get("gates"), f"{path}.gates"))
+    )
+    gate_ids = [item.identifier for item in gates]
+    if len(gate_ids) != len(set(gate_ids)):
+        raise ConfigurationError(f"{path}.gates: duplicate ID")
+
+    hooks: list[Hook] = []
+    for index, raw in enumerate(_table_array(value.get("hooks"), f"{path}.hooks")):
+        context = f"{path}.hooks[{index}]"
+        closed_keys(raw, {"kind", "event", "entry"}, context)
+        kind = string(raw, "kind", context)
+        if kind not in {"git", "codex"}:
+            raise ConfigurationError(f"{context}.kind: expected git or codex")
+        entry = relative_path(string(raw, "entry", context), f"{context}.entry")
+        if not (repository / entry).is_file():
+            raise ConfigurationError(f"{context}.entry: central hook does not exist")
+        hooks.append(Hook(kind, string(raw, "event", context), entry))
+
+    skills = tuple(
+        relative_path(item, f"{path}.skills")
+        for item in string_list(value.get("skills"), f"{path}.skills")
+    )
+    for skill in skills:
+        if not (repository / skill).is_dir():
+            raise ConfigurationError(f"{path}.skills: central skill does not exist: {skill}")
+
+    return Profile(declared_name, tools, tuple(configurations), gates, tuple(hooks), skills, path)
+
+
+def _optional_path(value: object, context: str) -> Path | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ConfigurationError(f"{context}: expected a non-empty relative path")
+    return relative_path(value, context)
+
+
+def load_consumer(target: Path) -> Consumer:
+    """Load one tracked consumer `.qat.toml` declaration."""
+    path = target / ".qat.toml"
+    value = _document(path)
+    _schema(value, path)
+    closed_keys(
+        value,
+        {
+            "schema_version",
+            "profile",
+            "native_configurations",
+            "vocabulary",
+            "ast_grep",
+            "python",
+            "gates",
+            "protected_paths",
+            "work",
+        },
+        str(path),
+    )
+    native = tuple(
+        relative_path(item, f"{path}.native_configurations")
+        for item in string_list(
+            value.get("native_configurations", []), f"{path}.native_configurations"
+        )
+    )
+    protected = tuple(
+        relative_path(item, f"{path}.protected_paths")
+        for item in string_list(value.get("protected_paths", []), f"{path}.protected_paths")
+    )
+
+    vocabulary = value.get("vocabulary", {})
+    if not isinstance(vocabulary, dict):
+        raise ConfigurationError(f"{path}.vocabulary: expected a table")
+    closed_keys(vocabulary, {"file", "additions", "allowances"}, f"{path}.vocabulary")
+    additions = string_list(vocabulary.get("additions", []), f"{path}.vocabulary.additions")
+    allowances = string_list(vocabulary.get("allowances", []), f"{path}.vocabulary.allowances")
+
+    ast_grep = value.get("ast_grep", {})
+    if not isinstance(ast_grep, dict):
+        raise ConfigurationError(f"{path}.ast_grep: expected a table")
+    closed_keys(ast_grep, {"config", "tests"}, f"{path}.ast_grep")
+
+    python = value.get("python", {})
+    if not isinstance(python, dict):
+        raise ConfigurationError(f"{path}.python: expected a table")
+    closed_keys(python, {"project"}, f"{path}.python")
+
+    gates = tuple(
+        _gate(raw, f"{path}.gates[{index}]", consumer=True)
+        for index, raw in enumerate(_table_array(value.get("gates", []), f"{path}.gates"))
+    )
+    gate_ids = [item.identifier for item in gates]
+    if len(gate_ids) != len(set(gate_ids)):
+        raise ConfigurationError(f"{path}.gates: duplicate ID")
+
+    work = value.get("work")
+    if not isinstance(work, dict):
+        raise ConfigurationError(f"{path}.work: expected a table")
+    closed_keys(work, {"state_directory", "require_allowed_paths"}, f"{path}.work")
+    require_allowed = work.get("require_allowed_paths")
+    if not isinstance(require_allowed, bool):
+        raise ConfigurationError(f"{path}.work.require_allowed_paths: expected a boolean")
+
+    return Consumer(
+        profile=string(value, "profile", str(path)),
+        native_configurations=native,
+        vocabulary_file=_optional_path(vocabulary.get("file"), f"{path}.vocabulary.file"),
+        vocabulary_additions=additions,
+        vocabulary_allowances=allowances,
+        ast_grep_config=_optional_path(ast_grep.get("config"), f"{path}.ast_grep.config"),
+        ast_grep_tests=_optional_path(ast_grep.get("tests"), f"{path}.ast_grep.tests"),
+        python_project=_optional_path(python.get("project"), f"{path}.python.project"),
+        gates=gates,
+        protected_paths=protected,
+        work_state_directory=relative_path(
+            string(work, "state_directory", f"{path}.work"), f"{path}.work.state_directory"
+        ),
+        work_require_allowed_paths=require_allowed,
+        source=path,
+    )
+
+
+def digest_profile(profile: Profile) -> str:
+    """Return the digest of the exact tracked profile bytes."""
+    return hashlib.sha256(profile.source.read_bytes()).hexdigest()
+
+
+def digest_consumer(consumer: Consumer) -> str:
+    """Return the digest of the exact tracked consumer declaration bytes."""
+    return hashlib.sha256(consumer.source.read_bytes()).hexdigest()
+
+
+def profile_summary(profile: Profile) -> str:
+    """Serialize stable profile facts for command output."""
+    return json.dumps(
+        {
+            "name": profile.name,
+            "tools": list(profile.tools),
+            "configurations": [item.identifier for item in profile.configurations],
+            "gates": [item.identifier for item in profile.gates],
+            "hooks": [f"{item.kind}:{item.event}" for item in profile.hooks],
+            "skills": [str(item) for item in profile.skills],
+            "digest": digest_profile(profile),
+        },
+        sort_keys=True,
+    )

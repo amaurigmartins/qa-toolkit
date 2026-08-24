@@ -1,0 +1,12 @@
+schema_version = 1
+name = "disposable-python"
+tools = [
+  "uv", "gitleaks", "cocogitto", "shellcheck", "actionlint", "osv-scanner", "zizmor",
+  "ast-grep", "vale", "node", "cspell", "python", "ruff", "mypy", "pytest", "coverage",
+  "pytest-cov", "pylint", "vulture", "import-linter", "pydoclint", "grain", "slop", "pip-audit",
+]
+configurations = []
+gates = []
+hooks = []
+skills = []
+
