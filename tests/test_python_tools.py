@@ -67,7 +67,7 @@ class PythonToolAcceptanceTests(unittest.TestCase):
         )
         self.assertEqual(len(resolution.digests), 8)
         python_paths = resolution.environment["PYTHONPATH"].split(os.pathsep)
-        self.assertEqual(Path(python_paths[0]), toolkit_root() / "src")
+        self.assertEqual(Path(python_paths[0]), self.target)
         self.assertIn(str(self.target), python_paths)
 
         ast = resolve_ast_grep(consumer, target=self.target, root=toolkit_root())
@@ -94,6 +94,12 @@ class PythonToolAcceptanceTests(unittest.TestCase):
         ):
             self.assertEqual(identifiers.count(identifier), 1)
         self.assertEqual(identifiers.count("python-tests"), 1)
+        internal = next(gate for gate in plan if gate.identifier == "text-spelling")
+        tests = next(gate for gate in plan if gate.identifier == "python-tests")
+        internal_paths = dict(internal.environment)["PYTHONPATH"].split(os.pathsep)
+        test_paths = dict(tests.environment)["PYTHONPATH"].split(os.pathsep)
+        self.assertEqual(Path(internal_paths[0]), toolkit_root() / "src")
+        self.assertEqual(Path(test_paths[0]), self.target)
 
     def test_consumer_cannot_run_a_centrally_owned_tool(self) -> None:
         for argv in (

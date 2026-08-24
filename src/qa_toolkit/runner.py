@@ -148,6 +148,18 @@ def _planned(
     python: PythonResolution | None,
     environment: dict[str, str] | None = None,
 ) -> PlannedGate:
+    resolved_environment = dict(environment or {})
+    if (
+        len(gate.argv) >= 3
+        and gate.argv[0] == "{qat-python}"
+        and gate.argv[1] == "-m"
+        and gate.argv[2].startswith("qa_toolkit.")
+    ):
+        central_source = str((root / "src").resolve())
+        existing = resolved_environment.get("PYTHONPATH", "").split(os.pathsep)
+        resolved_environment["PYTHONPATH"] = os.pathsep.join(
+            (central_source, *(item for item in existing if item and item != central_source))
+        )
     return PlannedGate(
         identifier=gate.identifier,
         phase=gate.phase,
@@ -158,7 +170,7 @@ def _planned(
         execution_error_exit_codes=gate.execution_error_exit_codes,
         execution_owner=owner,
         rule_source=str(source),
-        environment=tuple(sorted((environment or {}).items())),
+        environment=tuple(sorted(resolved_environment.items())),
     )
 
 

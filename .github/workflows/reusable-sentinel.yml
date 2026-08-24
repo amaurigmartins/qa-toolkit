@@ -22,7 +22,6 @@ on:
         required: false
         default: 14
         type: number
-
 permissions:
   contents: read
 
@@ -72,6 +71,10 @@ jobs:
       - name: Reconstruct central tools
         run: ./bootstrap.sh
         working-directory: toolkit
+
+      - name: Link exact self-test payload
+        if: github.repository == 'amaurigmartins/qa-toolkit'
+        run: ln -s ../toolkit/toolkit target/toolkit
 
       - name: Enroll consumer locally
         run: ../toolkit/bin/qat repo enroll .

@@ -19,6 +19,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('test "${#TOOLKIT_REVISION}" -eq 40', content)
         self.assertIn("git -C toolkit rev-parse HEAD)", content)
         self.assertIn("repository: amaurigmartins/qa-toolkit", content)
+        self.assertIn("github.repository == 'amaurigmartins/qa-toolkit'", content)
+        self.assertIn("ln -s ../toolkit/toolkit target/toolkit", content)
         self.assertEqual(content.count("name: Run Sentinel once"), 1)
         self.assertIn("target/.git/qat/evidence", content)
         self.assertNotIn("unslopifier", content.casefold())

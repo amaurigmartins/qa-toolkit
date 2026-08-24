@@ -319,7 +319,7 @@ def _import_linter_gate(target: Path, consumer: Consumer) -> tuple[Gate, str] | 
 
 def _python_environment(target: Path, root: Path, consumer: Consumer) -> dict[str, str]:
     project = (target / (consumer.python.project or Path("."))).resolve()
-    paths = [root / "src", project, project / "src"]
+    paths = [project, project / "src", root / "src"]
     for environment_root in (project / ".venv", target / ".venv"):
         paths.extend(sorted(environment_root.glob("lib/python*/site-packages")))
     existing = tuple(dict.fromkeys(path.resolve() for path in paths if path.exists()))
