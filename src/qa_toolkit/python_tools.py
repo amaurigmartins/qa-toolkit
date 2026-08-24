@@ -17,6 +17,7 @@ from qa_toolkit.deployment import tracked_regular_files
 from qa_toolkit.models import (
     Consumer,
     Gate,
+    MypySettings,
     PydoclintSettings,
     PylintSettings,
     PythonTool,
@@ -59,8 +60,16 @@ _CONFIG_NAMES = ("ruff", "mypy", "pylint", "pydoclint", "coverage", "vulture", "
 
 def _validate_scope(consumer: Consumer, target: Path) -> None:
     tracked = tracked_regular_files(target)
-    overlays = (consumer.python.ruff, consumer.python.pylint, consumer.python.pydoclint)
-    selected_paths = tuple(path for overlay in overlays if overlay for path in overlay.paths)
+    selected_paths = tuple(
+        path
+        for paths in (
+            consumer.python.ruff.paths if consumer.python.ruff else (),
+            consumer.python.mypy.mypy_path if consumer.python.mypy else (),
+            consumer.python.pylint.paths if consumer.python.pylint else (),
+            consumer.python.pydoclint.paths if consumer.python.pydoclint else (),
+        )
+        for path in paths
+    )
     missing = sorted(
         {
             path
@@ -185,6 +194,31 @@ def _resolve_pylint(source: str, settings: PylintSettings | None) -> str:
             "min-similarity-lines",
             "Pylint similarity",
         )
+    return _render_toml(data)
+
+
+def _resolve_mypy(source: str, settings: MypySettings | None) -> str:
+    if settings is None:
+        return source
+    data = tomllib.loads(source)
+    values = _nested_table(data, "tool", "mypy")
+    plugins = _string_list(values, "plugins", "central MyPy plugins")
+    repeated = sorted(set(settings.plugins) & set(plugins))
+    if repeated:
+        raise PythonToolError("MyPy plugins repeat central values: " + ", ".join(repeated))
+    values["plugins"] = [*plugins, *settings.plugins]
+    if settings.mypy_path:
+        if "mypy_path" in values:
+            raise PythonToolError("central MyPy path cannot be replaced")
+        values["mypy_path"] = list(settings.mypy_path)
+    for field, key in (
+        (settings.explicit_package_bases, "explicit_package_bases"),
+        (settings.namespace_packages, "namespace_packages"),
+    ):
+        if field is not None:
+            if not field:
+                raise PythonToolError(f"MyPy {key} may only be tightened to true")
+            values[key] = True
     return _render_toml(data)
 
 
@@ -342,6 +376,7 @@ def resolve_python(target: Path, root: Path, consumer: Consumer) -> PythonResolu
         name: (central / f"{name}.toml").read_text(encoding="utf-8") for name in _CONFIG_NAMES
     }
     sources["ruff"] = _resolve_ruff(sources["ruff"], consumer)
+    sources["mypy"] = _resolve_mypy(sources["mypy"], consumer.python.mypy)
     sources["pylint"] = _resolve_pylint(sources["pylint"], consumer.python.pylint)
     sources["pydoclint"] = _resolve_pydoclint(sources["pydoclint"], consumer.python.pydoclint)
     configurations, digests = _atomic_configs(target / ".qat/generated/python", sources)

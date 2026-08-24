@@ -56,6 +56,16 @@ class PydoclintSettings:
     check_class_attributes: bool | None = None
 
 
+@dataclass(frozen=True)
+class MypySettings:
+    """Typed additions to the central strict MyPy configuration."""
+
+    plugins: tuple[str, ...] = ()
+    mypy_path: tuple[str, ...] = ()
+    explicit_package_bases: bool | None = None
+    namespace_packages: bool | None = None
+
+
 @dataclass(frozen=True, order=True)
 class PythonException:
     """One rule, bounded path, and reason-bearing analyser exception."""
@@ -72,6 +82,7 @@ class PythonSettings:
 
     project: Path | None = None
     ruff: RuffSettings | None = None
+    mypy: MypySettings | None = None
     pylint: PylintSettings | None = None
     pydoclint: PydoclintSettings | None = None
     exceptions: tuple[PythonException, ...] = ()
@@ -168,6 +179,7 @@ class ConsumerGate:
     variants: tuple[str, ...]
     finding_exit_codes: tuple[int, ...]
     execution_error_exit_codes: tuple[int, ...]
+    before: str | None = None
 
 
 @dataclass(frozen=True)

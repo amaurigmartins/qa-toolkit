@@ -99,6 +99,16 @@ class PythonDeclarationTests(unittest.TestCase):
             "python.pydoclint",
         )
         self.assertTrue(pydoclint.check_class_attributes)
+        mypy = config._mypy_settings(
+            {
+                "plugins": ["pydantic.mypy"],
+                "mypy_path": ["src"],
+                "explicit_package_bases": True,
+                "namespace_packages": True,
+            },
+            "python.mypy",
+        )
+        self.assertEqual(mypy.plugins, ("pydantic.mypy",))
         exceptions = config._python_exceptions(
             [{"tool": "ruff", "rule": "S603", "path": "tests/**", "reason": "Tests run arrays."}],
             "python.exceptions",
@@ -115,6 +125,8 @@ class PythonDeclarationTests(unittest.TestCase):
             lambda: config._pylint_settings({"enable": ["Bad"]}, "pylint"),
             lambda: config._pydoclint_settings([], "pydoclint"),
             lambda: config._pydoclint_settings({"check_class_attributes": "yes"}, "pydoclint"),
+            lambda: config._mypy_settings({"plugins": ["bad-name"]}, "mypy"),
+            lambda: config._mypy_settings({"explicit_package_bases": "yes"}, "mypy"),
             lambda: config._python_exceptions({}, "exceptions"),
             lambda: config._python_exceptions(
                 [{"tool": "mypy", "rule": "S603", "path": "tests/**", "reason": "Reason"}],
@@ -147,7 +159,14 @@ class PythonDeclarationTests(unittest.TestCase):
 class GateDeclarationTests(unittest.TestCase):
     def test_profile_and_consumer_gates_have_distinct_types(self) -> None:
         self.assertIsInstance(config._gate(_gate(), "gate", consumer=False), Gate)
-        self.assertIsInstance(config._gate(_gate(), "gate", consumer=True), ConsumerGate)
+        consumer = _gate()
+        consumer["before"] = "later"
+        parsed = config._gate(consumer, "gate", consumer=True)
+        self.assertIsInstance(parsed, ConsumerGate)
+        self.assertEqual(parsed.before, "later")
+
+        with self.assertRaises(ConfigurationError):
+            config._gate(consumer, "gate", consumer=False)
 
     def test_gate_fields_and_exit_classes_are_closed(self) -> None:
         changes = (

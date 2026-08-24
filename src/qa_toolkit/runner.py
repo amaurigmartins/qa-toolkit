@@ -19,7 +19,7 @@ from typing import Literal
 from qa_toolkit.ast_grep import AstGrepPolicyError, resolve_ast_grep
 from qa_toolkit.config import digest_consumer, digest_profile, load_consumer, load_profile
 from qa_toolkit.corpus import CorpusError, build_corpus
-from qa_toolkit.deployment import DeploymentError, resolve_target, status
+from qa_toolkit.deployment import DeploymentError, resolve_target, status, tracked_regular_files
 from qa_toolkit.guardrail_state import GuardrailStateError, identity, record_proof
 from qa_toolkit.models import ConsumerGate, Gate
 from qa_toolkit.paths import payload_root, toolkit_root
@@ -118,6 +118,14 @@ def _resolve_arguments(
         config = re.fullmatch(r"\{python-config:([a-z-]+)\}", argument)
         central_config = re.fullmatch(r"\{central-config:([a-z0-9./-]+)\}", argument)
         paths = re.fullmatch(r"\{python-paths:([a-z-]+)\}", argument)
+        if argument == "{tracked-shell-files}":
+            shell_files = tuple(
+                path for path in tracked_regular_files(target) if path.endswith(".sh")
+            )
+            if not shell_files:
+                raise RunnerError("tracked-shell-files matched no regular shell source")
+            result.extend(shell_files)
+            continue
         if config is not None:
             if python is None or config.group(1) not in python.configurations:
                 raise RunnerError(f"unavailable Python configuration: {config.group(1)}")
@@ -174,6 +182,47 @@ def _planned(
     )
 
 
+def _ordered_sources(
+    sources: tuple[tuple[Gate | ConsumerGate, str, Path], ...],
+) -> tuple[tuple[Gate | ConsumerGate, str, Path], ...]:
+    """Place consumer gates before declared peers without changing unrelated order."""
+    identities = [gate.identifier for gate, _owner, _source in sources]
+    if len(identities) != len(set(identities)):
+        duplicate = next(item for item in identities if identities.count(item) > 1)
+        raise RunnerError(f"duplicate resolved gate ID: {duplicate}")
+    known = set(identities)
+    predecessors: dict[str, set[str]] = {identifier: set() for identifier in identities}
+    for gate, _owner, _source in sources:
+        if not isinstance(gate, ConsumerGate) or gate.before is None:
+            continue
+        if gate.before not in known:
+            raise RunnerError(
+                f"consumer gate {gate.identifier} names unavailable before gate: {gate.before}"
+            )
+        predecessors[gate.before].add(gate.identifier)
+    ordered: list[tuple[Gate | ConsumerGate, str, Path]] = []
+    emitted: set[str] = set()
+    visiting: set[str] = set()
+    by_identifier = {source[0].identifier: source for source in sources}
+    positions = {identifier: index for index, identifier in enumerate(identities)}
+
+    def emit(identifier: str) -> None:
+        if identifier in emitted:
+            return
+        if identifier in visiting:
+            raise RunnerError(f"consumer gate ordering cycle includes: {identifier}")
+        visiting.add(identifier)
+        for predecessor in sorted(predecessors[identifier], key=positions.__getitem__):
+            emit(predecessor)
+        visiting.remove(identifier)
+        ordered.append(by_identifier[identifier])
+        emitted.add(identifier)
+
+    for identifier in identities:
+        emit(identifier)
+    return tuple(ordered)
+
+
 def resolve_plan(
     target: Path,
     root: Path,
@@ -222,6 +271,7 @@ def _resolve_plan(
     )
     execution_environment = {} if python is None else dict(python.environment)
     execution_environment["PATH"] = os.pathsep.join((*selected_bins, os.environ.get("PATH", "")))
+    execution_environment["QAT_VARIANT"] = variant or ""
     for consumer_gate in consumer.gates:
         owned = owned_consumer_command(consumer_gate.argv)
         registry_id = "import-linter" if owned == "lint-imports" else owned
@@ -246,7 +296,7 @@ def _resolve_plan(
                 if gate.phase == phase
             )
         )
-        for gate, owner, source in sources:
+        for gate, owner, source in _ordered_sources(sources):
             if gate.identifier in seen:
                 raise RunnerError(f"duplicate resolved gate ID: {gate.identifier}")
             seen.add(gate.identifier)
