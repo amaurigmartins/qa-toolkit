@@ -1,12 +1,12 @@
 #!/bin/sh
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-REPOSITORY=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+REPOSITORY=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 PYTHON=${QAT_PYTHON:-"$REPOSITORY/toolkit/python/bin/python"}
 
 if [ ! -x "$PYTHON" ]; then
     PYTHON=python3
 fi
 
-exec "$PYTHON" "$REPOSITORY/src/qa_toolkit/dispatch.py" "$@"
+PYTHONDONTWRITEBYTECODE=1 exec "$PYTHON" "$REPOSITORY/src/qa_toolkit/dispatch.py" "$@"

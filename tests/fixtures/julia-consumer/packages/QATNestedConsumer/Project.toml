@@ -1,0 +1,13 @@
+name = "QATNestedConsumer"
+uuid = "b829e529-f25f-4a74-946f-7878c573a3c6"
+version = "0.1.0"
+
+[compat]
+Test = "1"
+julia = "1.10, 1.12"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

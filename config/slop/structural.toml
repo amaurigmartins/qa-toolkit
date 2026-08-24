@@ -1,0 +1,100 @@
+languages = ["python"]
+exclude = ["legacy/**", "templates/STE-Code-Current/**"]
+
+[rules.structural.complexity]
+enabled = false
+severity = "error"
+
+[rules.structural.class.complexity]
+enabled = true
+severity = "error"
+
+[rules.structural.class.coupling]
+enabled = true
+severity = "error"
+
+[rules.structural.class.inheritance.depth]
+enabled = true
+severity = "error"
+
+[rules.structural.class.inheritance.children]
+enabled = true
+severity = "error"
+
+[rules.structural.hotspots]
+enabled = true
+since = "14 days ago"
+min_commits = 2
+fail_on_quadrant = ["hotspot", "churning_simple"]
+severity = "warning"
+
+[rules.structural.packages]
+enabled = true
+fail_on_zone = ["pain"]
+severity = "warning"
+
+[rules.structural.deps]
+enabled = false
+
+[rules.structural.local_imports]
+enabled = false
+
+[rules.structural.redundancy]
+enabled = false
+min_shared = 3
+min_score = 0.5
+severity = "warning"
+
+[rules.structural.types.sentinels]
+enabled = false
+max_cardinality = 8
+require_str_annotation = true
+severity = "warning"
+
+[rules.structural.types.hidden_mutators]
+enabled = false
+require_type_annotation = true
+min_mutations = 1
+severity = "warning"
+
+[rules.structural.types.escape_hatches]
+enabled = false
+threshold = 0.30
+min_annotations = 5
+severity = "warning"
+
+[rules.structural.duplication]
+enabled = false
+
+[rules.structural.god_module]
+enabled = false
+threshold = 20
+severity = "warning"
+
+[rules.structural.orphans]
+enabled = false
+
+[rules.information.volume]
+enabled = false
+severity = "warning"
+
+[rules.information.difficulty]
+enabled = true
+severity = "warning"
+
+[rules.information.magic_literals]
+enabled = false
+threshold = 3
+severity = "warning"
+
+[rules.information.section_comments]
+enabled = false
+
+[rules.lexical.stutter]
+enabled = false
+
+[rules.lexical.verbosity]
+enabled = false
+
+[rules.lexical.tersity]
+enabled = false

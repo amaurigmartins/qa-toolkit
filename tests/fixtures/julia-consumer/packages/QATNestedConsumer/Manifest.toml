@@ -1,0 +1,10 @@
+# This file is machine-generated - editing it directly is not advised
+
+julia_version = "1.12.6"
+manifest_format = "2.0"
+project_hash = "8570d395f4d43a51eb71d11ae505e0bcf416b42a"
+
+[[deps.QATNestedConsumer]]
+path = "."
+uuid = "b829e529-f25f-4a74-946f-7878c573a3c6"
+version = "0.1.0"

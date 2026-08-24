@@ -1,0 +1,309 @@
+schema_version = 1
+
+[[terms]]
+id = "canonical"
+forms = ["canonical", "canonicalize", "canonicalization"]
+guidance = "Name the operation, such as normalize, sort, deduplicate, validate, primary, or stored. Reserve canonical for its mathematical meaning."
+suggestions = ["normalize", "sort", "deduplicate", "validate", "primary", "stored"]
+prose = "error"
+identifier = "error"
+commit = "error"
+
+[[terms]]
+id = "boundary"
+forms = ["boundary"]
+guidance = "Name the interface, module, input, output, dependency restriction, or object involved."
+suggestions = ["interface", "module", "input", "output"]
+prose = "warning"
+identifier = "error"
+commit = "warning"
+
+[[terms]]
+id = "provenance"
+forms = ["provenance"]
+guidance = "Name the source, origin, input file, version, or derived-from relation."
+suggestions = ["source", "origin", "input file", "version", "base"]
+prose = "warning"
+identifier = "error"
+commit = "warning"
+
+[[terms]]
+id = "registry"
+forms = ["registry"]
+guidance = "Name the mapping, table, index, or catalog unless this is an actual registration mechanism."
+suggestions = ["mapping", "table", "index", "catalog"]
+prose = "warning"
+identifier = "error"
+commit = "warning"
+
+[[terms]]
+id = "contract"
+forms = ["contract"]
+guidance = "Name the API, schema, invariant, precondition, postcondition, or signature."
+suggestions = ["API", "schema", "invariant", "precondition", "postcondition", "signature"]
+prose = "warning"
+identifier = "error"
+commit = "warning"
+
+[[terms]]
+id = "orchestration"
+forms = ["orchestration", "orchestrator"]
+guidance = "Name the driver, run, call sequence, or computation."
+suggestions = ["driver", "run", "call sequence"]
+prose = "error"
+identifier = "error"
+commit = "error"
+
+[[terms]]
+id = "service-layer"
+forms = ["service layer", "service abstraction"]
+guidance = "Name the module, function, client, or process."
+suggestions = ["module", "function", "client", "process"]
+prose = "error"
+identifier = "error"
+commit = "error"
+
+[[terms]]
+id = "middleware"
+forms = ["middleware"]
+guidance = "Name the converter, adapter, function, or transformation."
+suggestions = ["converter", "adapter", "function"]
+prose = "error"
+identifier = "error"
+commit = "error"
+
+[[terms]]
+id = "business-logic"
+forms = ["business logic", "business rule"]
+guidance = "Name the calculation, criterion, rule, or model."
+suggestions = ["calculation", "criterion", "rule", "model"]
+prose = "error"
+identifier = "error"
+commit = "error"
+
+[[terms]]
+id = "application-side"
+forms = ["backend", "frontend"]
+guidance = "Name the worker, UI, process, or server unless the architectural distinction is literal."
+suggestions = ["worker", "UI", "process", "server"]
+prose = "warning"
+identifier = "error"
+commit = "warning"
+
+[[terms]]
+id = "layer"
+forms = ["layer"]
+guidance = "Name the module, package, function, or adapter."
+suggestions = ["module", "package", "function", "adapter"]
+prose = "warning"
+identifier = "error"
+commit = "warning"
+
+[[terms]]
+id = "provider"
+forms = ["provider"]
+guidance = "Name the model, solver, source, or implementation."
+suggestions = ["model", "solver", "source", "implementation"]
+prose = "warning"
+identifier = "error"
+commit = "warning"
+
+[[terms]]
+id = "policy"
+forms = ["policy"]
+guidance = "Name the rule, criterion, or configuration."
+suggestions = ["rule", "criterion", "configuration"]
+prose = "warning"
+identifier = "error"
+commit = "warning"
+
+[[terms]]
+id = "lifecycle"
+forms = ["lifecycle"]
+guidance = "Name initialization, creation, shutdown, cleanup, or deletion."
+suggestions = ["initialization", "creation", "shutdown", "cleanup", "deletion"]
+prose = "warning"
+identifier = "error"
+commit = "warning"
+
+[[terms]]
+id = "capability"
+forms = ["capability"]
+guidance = "State the function or supported operation."
+suggestions = []
+prose = "error"
+identifier = "off"
+commit = "error"
+
+[[terms]]
+id = "integration"
+forms = ["integration"]
+guidance = "Name the conversion, call, import, connection, or data transfer."
+suggestions = ["conversion", "call", "import", "connection"]
+prose = "warning"
+identifier = "error"
+commit = "warning"
+
+[[terms]]
+id = "abstraction"
+forms = ["abstraction"]
+guidance = "Name the type, interface, function, or construct."
+suggestions = ["type", "interface", "function"]
+prose = "warning"
+identifier = "error"
+commit = "warning"
+
+[[terms]]
+id = "technology-group"
+forms = ["platform", "ecosystem", "technology stack"]
+guidance = "Delete the term or name the packages and components."
+suggestions = []
+prose = "error"
+identifier = "error"
+commit = "error"
+
+[[terms]]
+id = "deployment-puffery"
+forms = ["enterprise", "cloud-native", "production-ready"]
+guidance = "Delete the claim unless it names a verified deployment requirement."
+suggestions = []
+prose = "error"
+identifier = "error"
+commit = "error"
+
+[[terms]]
+id = "unmeasured-properties"
+forms = ["robust", "flexible", "scalable", "extensible"]
+guidance = "State the measurable property or delete the adjective."
+suggestions = []
+prose = "warning"
+identifier = "off"
+commit = "warning"
+
+[[terms]]
+id = "padding"
+forms = ["seamless", "sophisticated", "advanced", "comprehensive"]
+guidance = "Delete the padding or state the concrete mechanism."
+suggestions = []
+prose = "error"
+identifier = "off"
+commit = "error"
+
+[[terms]]
+id = "importance"
+forms = ["critical", "key", "important", "significant"]
+guidance = "State the consequence, threshold, or magnitude."
+suggestions = []
+prose = "warning"
+identifier = "off"
+commit = "warning"
+
+[[terms]]
+id = "single-source-of-truth"
+forms = ["single source of truth"]
+guidance = "Name the authoritative file, table, or object."
+suggestions = []
+prose = "error"
+identifier = "error"
+commit = "error"
+
+[[terms]]
+id = "architecture-padding"
+forms = ["policy-driven", "pluggable", "cross-cutting"]
+guidance = "State the actual rule, configuration, or dependency."
+suggestions = []
+prose = "error"
+identifier = "error"
+commit = "error"
+
+[[terms]]
+id = "scope-padding"
+forms = ["end-to-end", "holistic", "unified"]
+guidance = "State the actual scope."
+suggestions = []
+prose = "warning"
+identifier = "off"
+commit = "warning"
+
+[[terms]]
+id = "forbidden-compounds"
+forms = ["canonical boundary", "boundary contract", "registry provenance"]
+guidance = "Rewrite the sentence or name using concrete objects and operations."
+suggestions = []
+prose = "error"
+identifier = "error"
+commit = "error"
+
+[settings]
+locale = "en-GB"
+
+[prose]
+accepted = [
+  "API", "ASCII", "CLI", "Codex", "CSV", "Documenter", "DSL", "Git", "GitHub", "HTTP",
+  "HTTPS", "JSON", "Julia", "LaTeX", "Linux", "Markdown", "pgTAP", "POSIX", "Python",
+  "Ruff", "SQL", "SSH", "TOML", "TTY", "UUID", "Vale", "XML", "YAML",
+]
+hedges = [
+  "arguably", "generally", "in many cases", "it may be", "often", "perhaps", "potentially",
+  "typically",
+]
+fillers = [
+  "in order to", "it is important to note", "it is worth noting", "needless to say",
+  "the fact that",
+]
+
+[identifiers]
+accepted = ["api", "cli", "config", "id", "io", "json", "sql", "toml", "url", "uuid"]
+
+[roles]
+action = [
+  "add", "apply", "build", "check", "collect", "create", "delete", "detect", "execute", "export",
+  "fetch", "find", "format", "generate", "get", "install", "list", "load", "parse", "read",
+  "remove", "render", "replace", "resolve", "run", "select", "sync", "update", "validate",
+  "verify", "write",
+]
+outcome = [
+  "adds", "blocks", "builds", "creates", "detects", "fails", "finds", "loads", "preserves",
+  "rejects", "removes", "reports", "resolves", "returns", "runs", "updates", "validates", "writes",
+]
+concept = [
+  "argument", "command", "configuration", "consumer", "corpus", "dependency", "digest", "evidence",
+  "file", "finding", "gate", "hook", "identifier", "input", "message", "output", "path", "profile",
+  "repository", "result", "rule", "runtime", "source", "target", "term", "tool", "version",
+]
+plural_concept = [
+  "arguments", "commands", "configurations", "consumers", "dependencies", "files", "findings",
+  "gates", "hooks", "identifiers", "inputs", "outputs", "paths", "profiles", "repositories",
+  "results", "rules", "sources", "terms", "tools", "versions",
+]
+context = [
+  "central", "consumer", "documentation", "file", "full", "git", "julia", "local", "markdown",
+  "python", "repository", "runtime", "source", "target", "tool",
+]
+condition = ["accepted", "active", "available", "current", "enabled", "missing", "selected", "tracked"]
+qualifier = ["advisory", "blocking", "exact", "explicit", "local", "managed", "native", "shared"]
+
+[acronyms]
+accepted = [
+  "API", "ASCII", "CAUTION", "CLI", "CPU", "CSV", "DANGER", "DSL", "EOF", "GPU", "HTTP",
+  "HTTPS", "IDE", "IMPORTANT", "IO", "JSON", "KPI", "MIME", "NOTE", "POSIX", "RAM", "README",
+  "REST", "RFC", "SQL", "SSH", "STE", "SVG", "TCP", "TOML", "TTY", "UDP", "UI", "URI",
+  "URL", "UTC", "UTF", "UUID", "WARNING", "XDG", "XML", "YAML",
+]
+
+[sources]
+license_names = ["COPYING", "LICENSE", "NOTICE"]
+license_families = ["Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "GPL-3.0", "MIT"]
+generated_patterns = [
+  "**/Manifest.toml", "**/package-lock.json", "**/uv.lock", "**/generated/**", "**/vendor/**",
+]
+gitlab_cache_keys = ["files", "files_commits", "prefix"]
+
+[documents]
+suffixes = [".jl", ".markdown", ".md", ".py", ".tex"]
+documenter_directives = ["@autodocs", "@contents", "@docs", "@example", "@index", "@meta", "@raw", "@setup"]
+math_delimiters = ["$", "$$", "\\(", "\\[", "```math"]
+
+[ai_tells]
+directory = "config/vale/styles/ai-tells"
+severity = "advisory"

@@ -1,0 +1,63 @@
+schema_version = 1
+
+[terminology]
+accepted = [
+  "Cocogitto",
+  "docstrings",
+  "enroll",
+  "enrollment",
+  "evidentiary",
+  "Gridform",
+  "LLMs",
+  "metadiscursive",
+  "misclassify",
+  "nominalizations",
+  "Prek",
+  "Pydoclint",
+  "Pylint",
+  "pyproject",
+  "tbhb",
+  "unenroll",
+  "unenrollment",
+  "Unslopifier",
+  "worktree",
+]
+rejected = []
+
+[terminology.replacements]
+
+[acronyms]
+accepted = []
+
+[roles]
+action = []
+outcome = []
+concept = []
+plural_concept = []
+context = []
+condition = []
+qualifier = []
+
+[[allowances]]
+term = "color"
+paths = ["config/vale/styles/STECode/README.md"]
+reason = "The policy document names the AmericanSpelling rule's literal input."
+
+[[allowances]]
+term = "catalog"
+paths = ["config/vale/styles/STECode/README.md"]
+reason = "The policy document explains the repository terminology catalog."
+
+[[allowances]]
+term = "license"
+paths = ["config/vale/styles/ai-tells/UPSTREAM.md"]
+reason = "The retained upstream notice names its MIT license verbatim."
+
+[settings]
+locale = "en-GB"
+
+[sources]
+license_names = []
+license_families = []
+generated_patterns = []
+gitlab_cache_keys = []

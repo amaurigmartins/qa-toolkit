@@ -1,0 +1,6 @@
+extends: occurrence
+message: "Limit a paragraph to six sentences."
+level: warning
+scope: paragraph
+max: 6
+token: '[.!?](?:[[:space:]]|$)'

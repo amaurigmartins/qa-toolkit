@@ -1,0 +1,7 @@
+interface:
+  display_name: "Execute Work Item"
+  short_description: "Implement and publish one accepted task"
+  default_prompt: "Use $execute-work-item to implement and finish the staged qa-toolkit task."
+policy:
+  allow_implicit_invocation: false
+

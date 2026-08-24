@@ -1,0 +1,7 @@
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+show_error_codes = true
+pretty = false
+exclude = ["^\\.git/", "^\\.qat/", "^toolkit/"]

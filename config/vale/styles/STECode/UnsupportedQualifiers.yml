@@ -1,0 +1,8 @@
+extends: existence
+message: "Replace '%s' with the criterion, quantity, mechanism, or consequence."
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:highly|very) (?:accurate|efficient|important|reliable|robust|scalable|significant)\b'
+  - '\b(?:comprehensive|cutting-edge|enterprise-grade|future-proof|industrial-strength|mission-critical|next-generation|powerful|revolutionary|state-of-the-art|world-class)\b'
+  - '\b(?:obviously|undoubtedly|clearly) (?:demonstrates?|shows?|proves?|indicates?)\b'

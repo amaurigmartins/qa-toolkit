@@ -1,0 +1,36 @@
+engine: tree-sitter
+scopes:
+  - expr: |
+      ((module . (expression_statement (string) @docstring))
+       (#match? @docstring "^[\"']{3}")
+       (#offset! @docstring 0 3 0 -3))
+    type: md
+  - expr: |
+      ((class_definition
+         body: (block . (expression_statement (string) @docstring)))
+       (#match? @docstring "^[\"']{3}")
+       (#offset! @docstring 0 3 0 -3))
+    type: md
+  - expr: |
+      ((function_definition
+         body: (block . (expression_statement (string) @docstring)))
+       (#match? @docstring "^[\"']{3}")
+       (#offset! @docstring 0 3 0 -3))
+    type: md
+  - expr: |
+      ((module . (expression_statement (string) @docstring))
+       (#not-match? @docstring "^[\"']{3}")
+       (#offset! @docstring 0 1 0 -1))
+    type: md
+  - expr: |
+      ((class_definition
+         body: (block . (expression_statement (string) @docstring)))
+       (#not-match? @docstring "^[\"']{3}")
+       (#offset! @docstring 0 1 0 -1))
+    type: md
+  - expr: |
+      ((function_definition
+         body: (block . (expression_statement (string) @docstring)))
+       (#not-match? @docstring "^[\"']{3}")
+       (#offset! @docstring 0 1 0 -1))
+    type: md

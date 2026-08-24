@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+PYTHON=${QAT_PYTHON:-"$ROOT/toolkit/python/bin/python"}
+[ -x "$PYTHON" ] || PYTHON=python3
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$ROOT/src" exec "$PYTHON" -m qa_toolkit.tool_cli update "$@"

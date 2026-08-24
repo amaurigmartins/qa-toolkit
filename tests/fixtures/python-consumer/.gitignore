@@ -1,0 +1,3 @@
+.qat/
+.coverage
+__pycache__/

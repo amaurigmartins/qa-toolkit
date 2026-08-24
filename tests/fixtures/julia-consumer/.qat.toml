@@ -1,0 +1,12 @@
+schema_version = 1
+profile = "disposable-julia"
+native_configurations = ["Project.toml", "Manifest.toml", ".JuliaFormatter.toml"]
+protected_paths = ["src", "test", "packages"]
+
+[vocabulary]
+additions = ["QATJuliaConsumer", "QATNestedConsumer"]
+allowances = []
+
+[work]
+state_directory = ".git/qat/work"
+require_allowed_paths = true

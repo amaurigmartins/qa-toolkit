@@ -1,0 +1,6 @@
+extends: conditional
+message: "Define '%s' at first use or record it as established project terminology."
+level: warning
+scope: text
+first: '\b([A-Z][A-Z0-9]{2,7})s?\b'
+second: 'a^'

@@ -1,0 +1,3 @@
+#!/bin/sh
+set -eu
+exec "$QAT_ROOT/toolkit/python/bin/python" -m qa_toolkit.codex_hooks fast-check

@@ -1,0 +1,6 @@
+extends: existence
+message: "Replace repository term '%s' with the configured preferred wording."
+level: error
+ignorecase: true
+tokens:
+  - "a^"

@@ -1,0 +1,5 @@
+extends: existence
+message: "Replace the bare demonstrative in '%s' with the quantity, object, or operation."
+level: warning
+tokens:
+  - '\b(?:This|That|These|Those)\s+(?:is|are|was|were|can|may|must|will|has|have|causes?|shows?|provides?)\b'

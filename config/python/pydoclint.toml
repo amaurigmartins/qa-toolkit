@@ -1,0 +1,11 @@
+[tool.pydoclint]
+style = "google"
+check-return-types = true
+check-yield-types = true
+check-arg-order = true
+skip-checking-short-docstrings = true
+allow-init-docstring = true
+should-document-private-class-attributes = false
+check-class-attributes = false
+require-return-section-when-returning-nothing = false
+exclude = "\\.git|\\.qat|\\.venv|build|dist|toolkit"

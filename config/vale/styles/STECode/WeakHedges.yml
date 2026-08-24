@@ -1,0 +1,12 @@
+extends: existence
+message: "Replace '%s' with the applicable condition or measured uncertainty."
+level: error
+ignorecase: true
+tokens:
+  - '\bmaybe\b'
+  - '\bperhaps\b'
+  - '\barguably\b'
+  - '\bit should be noted\b'
+  - '\bgenerally speaking\b'
+  - '\bin many cases\b'
+  - '\bto some extent\b'

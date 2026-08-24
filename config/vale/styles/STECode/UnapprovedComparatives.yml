@@ -1,0 +1,27 @@
+extends: substitution
+message: "Use the approved adjective form '%s' instead of '%s'."
+level: error
+ignorecase: true
+swap:
+  more fast: faster
+  most fast: fastest
+  more slow: slower
+  most slow: slowest
+  more easy: easier
+  most easy: easiest
+  more large: larger
+  most large: largest
+  more small: smaller
+  most small: smallest
+  blacker: black
+  blackest: black
+  bluer: blue
+  bluest: blue
+  greener: green
+  greenest: green
+  redder: red
+  reddest: red
+  whiter: white
+  whitest: white
+  yellower: yellow
+  yellowest: yellow

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Plan Work Package"
+  short_description: "Prepare one closed structured work task"
+  default_prompt: "Use $plan-work-package to encode this approved plan as one qa-toolkit work task."
+policy:
+  allow_implicit_invocation: false
+

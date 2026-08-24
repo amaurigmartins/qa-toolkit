@@ -1,0 +1,6 @@
+extends: existence
+message: "A NOTE gives information only; move the command in '%s' to a procedural step."
+level: error
+ignorecase: true
+tokens:
+  - '\bNOTE:[[:space:]]+(?:add|apply|build|call|change|check|close|compile|compute|connect|convert|copy|create|delete|do|edit|enter|get|initialize|install|keep|make|move|open|parse|put|read|remove|replace|run|select|send|set|start|stop|test|update|use|validate|write)\b'

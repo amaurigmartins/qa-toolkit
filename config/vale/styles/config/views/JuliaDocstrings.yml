@@ -1,0 +1,55 @@
+engine: tree-sitter
+scopes:
+  - expr: |
+      ((_ (string_literal) @docstring .
+          [(abstract_definition)
+           (assignment)
+           (call_expression)
+           (const_statement)
+           (function_definition)
+           (identifier)
+           (macro_definition)
+           (macrocall_expression)
+           (module_definition)
+           (primitive_definition)
+           (struct_definition)
+           (typed_expression)])
+       (#match? @docstring "^\"{3}")
+       (#offset! @docstring 0 3 0 -3))
+    type: md
+  - expr: |
+      ((_ (string_literal) @docstring .
+          [(abstract_definition)
+           (assignment)
+           (call_expression)
+           (const_statement)
+           (function_definition)
+           (identifier)
+           (macro_definition)
+           (macrocall_expression)
+           (module_definition)
+           (primitive_definition)
+           (struct_definition)
+           (typed_expression)])
+       (#not-match? @docstring "^\"{3}")
+       (#offset! @docstring 0 1 0 -1))
+    type: md
+  - expr: |
+      ((macrocall_expression
+         (macro_identifier) @macro
+         (macro_argument_list (string_literal) @docstring))
+       (#eq? @macro "@doc")
+       (#match? @docstring "^\"{3}")
+       (#offset! @docstring 0 3 0 -3))
+    type: md
+  - expr: |
+      ((macrocall_expression
+         (macro_identifier) @macro
+         (macro_argument_list
+           (prefixed_string_literal
+             prefix: (identifier) @prefix) @docstring))
+       (#eq? @macro "@doc")
+       (#eq? @prefix "raw")
+       (#match? @docstring "^raw\"{3}")
+       (#offset! @docstring 0 6 0 -3))
+    type: md

@@ -1,0 +1,9 @@
+extends: substitution
+message: "Use '%s' instead of the STE-Code connector '%s'."
+level: error
+ignorecase: true
+swap:
+  moreover: also
+  furthermore: also
+  nevertheless: however
+  subsequently: then

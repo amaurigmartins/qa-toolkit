@@ -1,0 +1,7 @@
+interface:
+  display_name: "Run Work Package"
+  short_description: "Advance an accepted task sequence"
+  default_prompt: "Use $run-work-package to advance the already accepted qa-toolkit work package."
+policy:
+  allow_implicit_invocation: false
+

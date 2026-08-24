@@ -1,0 +1,6 @@
+extends: existence
+message: "Start the list item with an uppercase word instead of '%s'."
+level: warning
+scope: list
+tokens:
+  - '\A[[:lower:]][[:alpha:]-]*\b'

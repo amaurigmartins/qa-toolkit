@@ -1,0 +1,57 @@
+schema_version = 1
+profile = "disposable-python"
+native_configurations = ["pyproject.toml"]
+protected_paths = ["scripts/test-live.sh", "src"]
+
+[vocabulary]
+additions = []
+allowances = []
+
+[ast_grep]
+config = "sgconfig.yml"
+tests = "sg-rule-tests"
+
+[python]
+project = "."
+
+[python.ruff]
+extend_select = ["C90", "FIX", "PLR", "PT", "PTH", "SLF", "T20", "TID", "TRY"]
+enforce = ["ANN401", "D105", "D107", "S603", "S606", "S607"]
+paths = ["."]
+known_first_party = ["package", "tests"]
+
+[python.ruff.thresholds]
+max_complexity = 8
+max_args = 6
+max_returns = 4
+
+[python.pylint]
+enable = []
+paths = ["src"]
+min_similarity_lines = 5
+
+[python.pydoclint]
+paths = ["src"]
+skip_checking_short_docstrings = false
+check_class_attributes = true
+
+[[python.exceptions]]
+tool = "ruff"
+rule = "S603"
+path = "tests/**"
+reason = "Tests may exercise bounded argv arrays."
+
+[[gates]]
+id = "consumer-live-proof"
+phase = "sentinel"
+argv = ["scripts/test-live.sh"]
+triggers = ["scripts/test-live.sh", "src/**", "tests/**"]
+timeout = 60
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[work]
+state_directory = ".git/qat/work"
+require_allowed_paths = true

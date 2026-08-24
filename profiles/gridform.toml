@@ -1,0 +1,106 @@
+schema_version = 1
+name = "gridform"
+tools = [
+  "uv", "gitleaks", "cocogitto", "jq", "yq", "prek", "fd", "ripgrep", "shellcheck",
+  "actionlint", "osv-scanner", "zizmor", "ast-grep", "vale", "node", "cspell", "python",
+  "ruff", "mypy", "pytest", "coverage", "pytest-cov", "pylint", "vulture", "import-linter",
+  "pydoclint", "grain", "slop", "pip-audit", "gh",
+]
+configurations = []
+skills = [
+  "library/skills/plan-work-package",
+  "library/skills/stage-work-item",
+  "library/skills/execute-work-item",
+  "library/skills/reconcile-work-item",
+  "library/skills/run-work-package",
+  "library/skills/close-work-package",
+  "library/skills/release-work-package",
+]
+
+[[hooks]]
+kind = "git"
+event = "pre-commit"
+entry = "library/git-hooks/pre-commit/quality"
+enabled = true
+
+[[hooks]]
+kind = "git"
+event = "commit-msg"
+entry = "library/git-hooks/commit-msg/commit-message"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "SessionStart"
+entry = "library/codex-hooks/SessionStart/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PreToolUse"
+entry = "library/codex-hooks/PreToolUse/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PermissionRequest"
+entry = "library/codex-hooks/PermissionRequest/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PostToolUse"
+entry = "library/codex-hooks/PostToolUse/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PostToolUse"
+entry = "library/codex-hooks/PostToolUse/fast-check"
+enabled = false
+
+[[hooks]]
+kind = "codex"
+event = "Stop"
+entry = "library/codex-hooks/Stop/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "SessionEnd"
+entry = "library/codex-hooks/SessionEnd/guardrail"
+enabled = true
+
+
+[[gates]]
+id = "text-spelling"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "cspell", "--target", "."]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.py", "**/*.jl", "**/*.toml", "**/*.json", "**/*.yml", "**/*.yaml", "**/*.sh"]
+timeout = 300
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "text-prose"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "vale", "--target", "."]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.py", "**/*.jl"]
+timeout = 300
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "text-ai-tells"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "vale", "--target", ".", "--advisory"]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.py", "**/*.jl"]
+timeout = 300
+severity = "advisory"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]

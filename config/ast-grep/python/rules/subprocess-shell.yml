@@ -1,0 +1,11 @@
+id: python-subprocess-shell
+language: Python
+rule:
+  any:
+    - pattern: subprocess.run($$$ARGS, shell=True, $$$REST)
+    - pattern: subprocess.call($$$ARGS, shell=True, $$$REST)
+    - pattern: subprocess.Popen($$$ARGS, shell=True, $$$REST)
+    - pattern: subprocess.check_call($$$ARGS, shell=True, $$$REST)
+    - pattern: subprocess.check_output($$$ARGS, shell=True, $$$REST)
+message: Pass an argv sequence to subprocess and keep shell=False.
+severity: error

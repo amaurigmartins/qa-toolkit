@@ -1,0 +1,6 @@
+extends: occurrence
+message: "Limit descriptive sentences to 25 words."
+level: warning
+scope: sentence
+max: 25
+token: '(?:\([^()\n]*\)|"[^"\n]*"|\b[[:digit:]]+(?:\.[[:digit:]]+)?[[:space:]]*(?:%|ns|us|ms|s|Hz|kHz|MHz|GHz|B|KB|MB|GB|KiB|MiB|GiB|mm|cm|km)\b|\b[[:alnum:]][[:alnum:]_./:+-]*\b)'

@@ -1,0 +1,29 @@
+extends: substitution
+message: "Use '%s' instead of '%s'."
+level: error
+ignorecase: true
+swap:
+  utilize: use
+  utilizes: uses
+  utilized: used
+  utilizing: using
+  commence: start
+  commences: starts
+  commenced: started
+  commencing: starting
+  terminate: stop
+  terminates: stops
+  terminated: stopped
+  terminating: stopping
+  leverage: use
+  leverages: uses
+  leveraged: used
+  leveraging: using
+  employ: use
+  employs: uses
+  employed: used
+  employing: using
+  initiate: start
+  initiates: starts
+  initiated: started
+  initiating: starting

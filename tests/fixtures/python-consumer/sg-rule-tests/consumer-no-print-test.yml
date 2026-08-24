@@ -1,0 +1,5 @@
+id: consumer-no-print
+valid:
+  - logger.info("measured")
+invalid:
+  - print("measured")

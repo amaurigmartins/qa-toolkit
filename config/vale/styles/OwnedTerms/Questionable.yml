@@ -1,0 +1,28 @@
+extends: existence
+message: "Replace vague terminology '%s' with the exact operation, object, or property."
+level: warning
+ignorecase: true
+tokens:
+  - "\\babstraction\\b"
+  - "\\bbackend\\b"
+  - "\\bboundary\\b"
+  - "\\bcontract\\b"
+  - "\\bcritical\\b"
+  - "\\bend[\\s_-]+to[\\s_-]+end\\b"
+  - "\\bextensible\\b"
+  - "\\bflexible\\b"
+  - "\\bfrontend\\b"
+  - "\\bholistic\\b"
+  - "\\bimportant\\b"
+  - "\\bintegration\\b"
+  - "\\bkey\\b"
+  - "\\blayer\\b"
+  - "\\blifecycle\\b"
+  - "\\bpolicy\\b"
+  - "\\bprovenance\\b"
+  - "\\bprovider\\b"
+  - "\\bregistry\\b"
+  - "\\brobust\\b"
+  - "\\bscalable\\b"
+  - "\\bsignificant\\b"
+  - "\\bunified\\b"

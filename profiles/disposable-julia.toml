@@ -1,0 +1,155 @@
+schema_version = 1
+name = "disposable-julia"
+tools = [
+  "gitleaks", "cocogitto", "shellcheck", "actionlint", "osv-scanner", "zizmor", "ast-grep",
+  "trivy", "vale", "node", "cspell", "python", "grain", "slop", "julia-1.10.11",
+  "julia-1.12.6", "juliaformatter", "aqua", "explicitimports",
+]
+configurations = []
+skills = []
+hooks = []
+
+
+[[gates]]
+id = "julia-source"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_source", "--target", "."]
+triggers = ["**/*.jl"]
+timeout = 120
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-format-1.10.11"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "format", "--runtime", "1.10.11", "--target", "."]
+triggers = ["**/*.jl", "**/.JuliaFormatter.toml"]
+timeout = 300
+severity = "blocking"
+variants = ["1.10.11"]
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-format-1.12.6"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "format", "--runtime", "1.12.6", "--target", "."]
+triggers = ["**/*.jl", "**/.JuliaFormatter.toml"]
+timeout = 300
+severity = "blocking"
+variants = ["1.12.6"]
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-tests-1.10.11"
+phase = "sentinel"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "tests", "--runtime", "1.10.11", "--target", "."]
+triggers = ["**/*.jl", "**/Project.toml", "**/Manifest.toml"]
+timeout = 1200
+severity = "blocking"
+variants = ["1.10.11"]
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-tests-1.12.6"
+phase = "sentinel"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "tests", "--runtime", "1.12.6", "--target", "."]
+triggers = ["**/*.jl", "**/Project.toml", "**/Manifest.toml"]
+timeout = 1200
+severity = "blocking"
+variants = ["1.12.6"]
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-aqua-1.10.11"
+phase = "sentinel"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "aqua", "--runtime", "1.10.11", "--target", "."]
+triggers = ["**/*.jl", "**/Project.toml", "**/Manifest.toml"]
+timeout = 900
+severity = "blocking"
+variants = ["1.10.11"]
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-aqua-1.12.6"
+phase = "sentinel"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "aqua", "--runtime", "1.12.6", "--target", "."]
+triggers = ["**/*.jl", "**/Project.toml", "**/Manifest.toml"]
+timeout = 900
+severity = "blocking"
+variants = ["1.12.6"]
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-explicit-imports-1.10.11"
+phase = "sentinel"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "explicit-imports", "--runtime", "1.10.11", "--target", "."]
+triggers = ["**/*.jl", "**/Project.toml", "**/Manifest.toml"]
+timeout = 900
+severity = "blocking"
+variants = ["1.10.11"]
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-explicit-imports-1.12.6"
+phase = "sentinel"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "explicit-imports", "--runtime", "1.12.6", "--target", "."]
+triggers = ["**/*.jl", "**/Project.toml", "**/Manifest.toml"]
+timeout = 900
+severity = "blocking"
+variants = ["1.12.6"]
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-vulnerabilities"
+phase = "sentinel"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "vulnerabilities", "--target", "."]
+triggers = ["**/Manifest.toml"]
+timeout = 600
+severity = "blocking"
+variants = ["1.10.11", "1.12.6"]
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+
+[[gates]]
+id = "text-spelling"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "cspell", "--target", "."]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.py", "**/*.jl", "**/*.toml", "**/*.json", "**/*.yml", "**/*.yaml", "**/*.sh"]
+timeout = 300
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "text-prose"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "vale", "--target", "."]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.py", "**/*.jl"]
+timeout = 300
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "text-ai-tells"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "vale", "--target", ".", "--advisory"]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.py", "**/*.jl"]
+timeout = 300
+severity = "advisory"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
