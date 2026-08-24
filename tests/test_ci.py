@@ -53,6 +53,18 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("Julia 1.10.11 / 1.12.6", content)
         self.assertNotIn("bin/qat sentinel", content)
 
+    def test_private_consumer_action_binds_its_exact_delivery_revision(self) -> None:
+        content = (ROOT / ".github/actions/sentinel/action.yml").read_text(encoding="utf-8")
+        self.assertIn("using: composite", content)
+        self.assertIn("ACTION_REF: ${{ github.action_ref }}", content)
+        self.assertIn('test "$ACTION_REF" = "$TOOLKIT_REVISION"', content)
+        self.assertIn(".qat-toolkit-revision", content)
+        self.assertEqual(content.count("name: Run Sentinel once"), 1)
+        self.assertIn("${{ inputs.target_path }}/.git/qat/evidence", content)
+        self.assertNotIn("actions/checkout", content)
+        references = ACTION.findall(content)
+        self.assertEqual(len(references), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

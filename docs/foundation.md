@@ -128,14 +128,18 @@ arguments and verify the returned repository identity.
 
 ## CI
 
-`.github/workflows/reusable-sentinel.yml` accepts an exact 40-character toolkit revision. It checks
-out the consumer and that exact toolkit commit separately, reconstructs `toolkit/`, enrols the
-consumer, validates commits, runs Sentinel once, and uploads the consumer's complete evidence
-directory. Callers must pin the workflow or checkout to an immutable toolkit commit.
+`.github/workflows/reusable-sentinel.yml` accepts an exact 40-character toolkit revision for this
+repository's own CI and for callers whose checkout credential can read qa-toolkit. It clones the
+consumer and toolkit separately, reconstructs `toolkit/`, enrols the consumer, validates commits,
+runs Sentinel once, and uploads the consumer's complete evidence directory.
 
-Private reusable-workflow access is a repository setting, not a toolkit side effect. When selective
-access is unavailable, a private consumer can checkout this repository at the exact commit inside
-its own workflow and run the same tracked commands.
+A private consumer uses `.github/actions/sentinel/action.yml` at an exact 40-character revision.
+GitHub's private-action delivery makes that repository snapshot available without exposing a
+long-lived token. The action verifies that its delivered ref equals the declared revision, writes a
+local revision marker into that snapshot, reconstructs the central payload, and performs the same
+enrolment, setup, commit validation, Sentinel, and evidence-upload sequence. Repository Actions
+access must permit the consumer to use private actions from qa-toolkit. Private-workflow access by
+itself does not authorise the consumer's `GITHUB_TOKEN` to clone another private repository.
 
 ## Explicit exclusions
 

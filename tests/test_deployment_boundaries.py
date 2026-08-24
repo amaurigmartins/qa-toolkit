@@ -271,9 +271,10 @@ class DeploymentTransactionTests(unittest.TestCase):
             _central(root)
             _consumer(target)
             with (
+                patch("qa_toolkit.deployment._toolkit_revision", return_value="a" * 40),
                 patch(
                     "qa_toolkit.deployment._revision",
-                    side_effect=("a" * 40, DeploymentError("target revision failed")),
+                    side_effect=DeploymentError("target revision failed"),
                 ),
                 self.assertRaisesRegex(DeploymentError, "target revision failed"),
             ):

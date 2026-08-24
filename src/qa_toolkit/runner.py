@@ -30,6 +30,7 @@ from qa_toolkit.python_tools import (
     resolve_python,
 )
 from qa_toolkit.registry import executable_path, select_tools
+from qa_toolkit.source_identity import SourceIdentityError, toolkit_facts
 from qa_toolkit.vocabulary import VocabularyError, resolve_vocabulary
 
 NormalizedResult = Literal["pass", "finding", "execution-error", "not-run"]
@@ -393,7 +394,10 @@ def execute(
     run_directory.mkdir(parents=True, exist_ok=False)
     consumer = load_consumer(target)
     profile = load_profile(consumer.profile, root)
-    toolkit_revision, toolkit_dirty, toolkit_fingerprint = _git_facts(root)
+    try:
+        toolkit_revision, toolkit_dirty, toolkit_fingerprint = toolkit_facts(root)
+    except SourceIdentityError as error:
+        raise RunnerError(str(error)) from error
     target_revision, target_dirty, target_fingerprint = _git_facts(target)
     sentinel_identity = identity(target, root) if mode == "sentinel" else None
     results: list[dict[str, object]] = []
