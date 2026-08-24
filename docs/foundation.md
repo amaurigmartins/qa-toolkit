@@ -46,7 +46,7 @@ rollback generations.
 A profile is complete and cannot inherit another profile. It names every selected tool, managed
 configuration, hook, skill, and ordered gate. The consumer file may add bounded native settings:
 
-- A Python project path and stricter typed Ruff, Pylint, or Pydoclint settings.
+- A Python project path and stricter typed Ruff, MyPy, Pylint, or Pydoclint settings.
 - A tracked ast-grep configuration and rule-test directory.
 - A tracked vocabulary file, additions, and path-bounded allowances.
 - Tracked additive argument-array gates, including an opaque live-test command.
@@ -56,10 +56,20 @@ Unknown fields, unsafe paths, weaker Python settings, copied central rules, and 
 a centrally owned tool fail validation. Import Linter runs only when the selected Python project
 contains tracked non-empty direction rules.
 
+Enrollment exposes every executable selected by the profile through recorded symlinks below
+`.qat/bin`. Names remain unchanged unless two selected runtimes provide the same executable. Those
+aliases use the tool IDs. Consumer gates may name one same-phase gate with `before` when an opaque
+preparation command must precede an ordinary central test. The selected variant is passed to every
+gate as `QAT_VARIANT`.
+
 Enrollment prefers symlinks. A profile may declare a copied configuration only when a tool cannot
 consume a link. Sync applies a three-way merge between the recorded base, the local copy, and the
 new central input. On conflict, it leaves the local copy unchanged and records the three inputs in
 `.git/qat`. `--hard-reset` is the sole discard operation.
+
+The reusable Sentinel workflow accepts one optional `setup_path`. It must be a tracked executable
+relative path and receives no interpolated arguments. The workflow runs it after enrollment and
+before commit validation and Sentinel execution.
 
 ## Retained intent
 

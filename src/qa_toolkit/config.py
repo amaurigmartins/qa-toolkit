@@ -17,6 +17,7 @@ from qa_toolkit.models import (
     ConsumerGate,
     Gate,
     Hook,
+    MypySettings,
     Profile,
     PydoclintSettings,
     PylintSettings,
@@ -156,6 +157,34 @@ def _pylint_settings(value: object, context: str) -> PylintSettings:
     )
 
 
+def _mypy_settings(value: object, context: str) -> MypySettings:
+    if not isinstance(value, dict):
+        raise ConfigurationError(f"{context}: expected a table")
+    closed_keys(
+        value,
+        {"plugins", "mypy_path", "explicit_package_bases", "namespace_packages"},
+        context,
+    )
+    plugins = _unique_strings(value.get("plugins"), f"{context}.plugins")
+    invalid = [item for item in plugins if _PYTHON_MODULE.fullmatch(item) is None]
+    if invalid:
+        raise ConfigurationError(f"{context}: invalid MyPy plugins: {', '.join(invalid)}")
+    return MypySettings(
+        plugins=plugins,
+        mypy_path=_python_paths(value.get("mypy_path"), f"{context}.mypy_path"),
+        explicit_package_bases=(
+            _boolean(value["explicit_package_bases"], f"{context}.explicit_package_bases")
+            if "explicit_package_bases" in value
+            else None
+        ),
+        namespace_packages=(
+            _boolean(value["namespace_packages"], f"{context}.namespace_packages")
+            if "namespace_packages" in value
+            else None
+        ),
+    )
+
+
 def _pydoclint_settings(value: object, context: str) -> PydoclintSettings:
     if not isinstance(value, dict):
         raise ConfigurationError(f"{context}: expected a table")
@@ -241,6 +270,7 @@ def _gate(raw: dict[str, Any], context: str, *, consumer: bool) -> Gate | Consum
             "variants",
             "finding_exit_codes",
             "execution_error_exit_codes",
+            *(("before",) if consumer else ()),
         },
         context,
     )
@@ -263,6 +293,7 @@ def _gate(raw: dict[str, Any], context: str, *, consumer: bool) -> Gate | Consum
     if overlap:
         raise ConfigurationError(f"{context}: exit classifications overlap")
     if consumer:
+        before = string(raw, "before", context) if "before" in raw else None
         return ConsumerGate(
             identifier,
             phase,
@@ -273,6 +304,7 @@ def _gate(raw: dict[str, Any], context: str, *, consumer: bool) -> Gate | Consum
             variants,
             finding_exits,
             error_exits,
+            before,
         )
     return Gate(
         identifier,
@@ -445,10 +477,15 @@ def load_consumer(target: Path) -> Consumer:
     python = value.get("python", {})
     if not isinstance(python, dict):
         raise ConfigurationError(f"{path}.python: expected a table")
-    closed_keys(python, {"project", "ruff", "pylint", "pydoclint", "exceptions"}, f"{path}.python")
+    closed_keys(
+        python,
+        {"project", "ruff", "mypy", "pylint", "pydoclint", "exceptions"},
+        f"{path}.python",
+    )
     python_settings = PythonSettings(
         project=_optional_path(python.get("project"), f"{path}.python.project"),
         ruff=_ruff_settings(python["ruff"], f"{path}.python.ruff") if "ruff" in python else None,
+        mypy=(_mypy_settings(python["mypy"], f"{path}.python.mypy") if "mypy" in python else None),
         pylint=(
             _pylint_settings(python["pylint"], f"{path}.python.pylint")
             if "pylint" in python

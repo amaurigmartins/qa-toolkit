@@ -25,6 +25,12 @@ max_complexity = 8
 max_args = 6
 max_returns = 4
 
+[python.mypy]
+plugins = []
+mypy_path = ["src"]
+explicit_package_bases = true
+namespace_packages = true
+
 [python.pylint]
 enable = []
 paths = ["src"]

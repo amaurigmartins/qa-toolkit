@@ -42,6 +42,10 @@ def _central(root: Path) -> None:
     (root / "registry/tools.json").write_bytes(
         (toolkit_root() / "registry/tools.json").read_bytes()
     )
+    jq = root / "toolkit/jq/bin/jq"
+    jq.parent.mkdir(parents=True)
+    jq.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    jq.chmod(0o755)
     (root / "config/sample").mkdir(parents=True)
     (root / "config/sample/link.txt").write_text("linked\n", encoding="utf-8")
     (root / "config/sample/copy.txt").write_text("alpha\nbase\ngamma\n", encoding="utf-8")
@@ -113,6 +117,9 @@ class DeploymentTests(unittest.TestCase):
             report = status(target, root)
 
             self.assertTrue(report["current"])
+            executable = target / ".qat/bin/jq"
+            self.assertTrue(executable.is_symlink())
+            self.assertTrue(os.access(executable, os.X_OK))
             link = target / ".qat/config/link.txt"
             self.assertTrue(link.is_symlink())
             self.assertEqual(link.read_text(encoding="utf-8"), "linked\n")
@@ -129,6 +136,28 @@ class DeploymentTests(unittest.TestCase):
             self.assertEqual(exclude.read_bytes(), exclude_before)
             self.assertTrue((target / ".qat.toml").is_file())
             self.assertTrue((target / "native.toml").is_file())
+
+    def test_sync_and_unenroll_refuse_a_modified_managed_executable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            root = parent / "central"
+            target = parent / "consumer"
+            root.mkdir()
+            target.mkdir()
+            _central(root)
+            _consumer(target)
+            enroll(target, root)
+            executable = target / ".qat/bin/jq"
+            executable.unlink()
+            executable.write_text("foreign\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(DeploymentError, "modified managed executable"):
+                sync(target, root)
+            with self.assertRaisesRegex(DeploymentError, "modified managed executables"):
+                unenroll(target)
+
+            sync(target, root, hard_reset=True)
+            self.assertTrue(executable.is_symlink())
 
     def test_sync_merges_distinct_changes_and_leaves_conflicts_outside_target(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

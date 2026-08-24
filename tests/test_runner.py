@@ -138,6 +138,18 @@ severity = "blocking"
 variants = ["normal"]
 finding_exit_codes = [1]
 execution_error_exit_codes = [2]
+
+[[gates]]
+id = "consumer-before-tests"
+phase = "sentinel"
+argv = ["{target-python}", "gate.py", "pass"]
+triggers = ["src/**"]
+timeout = 30
+severity = "blocking"
+variants = ["normal"]
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+before = "sentinel-finding"
 """
     (target / ".qat.toml").write_text(consumer, encoding="utf-8")
     _commit(target, "test(repo): add runner fixture")
@@ -167,16 +179,18 @@ class RunnerTests(unittest.TestCase):
                     "check-pass",
                     "check-advisory",
                     "consumer-check",
+                    "consumer-before-tests",
                     "sentinel-finding",
                     "sentinel-after",
                 ],
             )
             self.assertEqual(
                 [result["result"] for result in summary["results"]],
-                ["pass", "finding", "pass", "finding", "pass"],
+                ["pass", "finding", "pass", "pass", "finding", "pass"],
             )
             self.assertEqual(summary["results"][2]["execution_owner"], "consumer")
-            output = evidence / summary["results"][3]["stdout"]
+            self.assertEqual(dict(summary["results"][3]["environment"])["QAT_VARIANT"], "normal")
+            output = evidence / summary["results"][4]["stdout"]
             self.assertEqual(output.read_text(encoding="utf-8"), "stdout-finding\n")
 
     def test_execution_error_stops_commands_but_preserves_planned_order(self) -> None:

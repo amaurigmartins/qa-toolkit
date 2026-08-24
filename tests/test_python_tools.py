@@ -52,6 +52,7 @@ class PythonToolAcceptanceTests(unittest.TestCase):
         resolution = resolve_python(self.target, toolkit_root(), consumer)
         ruff = tomllib.loads(resolution.configurations["ruff"].read_text(encoding="utf-8"))
         pylint = tomllib.loads(resolution.configurations["pylint"].read_text(encoding="utf-8"))
+        mypy = tomllib.loads(resolution.configurations["mypy"].read_text(encoding="utf-8"))
         pydoclint = tomllib.loads(
             resolution.configurations["pydoclint"].read_text(encoding="utf-8")
         )
@@ -60,6 +61,8 @@ class PythonToolAcceptanceTests(unittest.TestCase):
         self.assertEqual(ruff["lint"]["pylint"]["max-returns"], 4)
         self.assertIn("S603", ruff["lint"]["per-file-ignores"]["tests/**"])
         self.assertEqual(pylint["tool"]["pylint"]["similarities"]["min-similarity-lines"], 5)
+        self.assertEqual(mypy["tool"]["mypy"]["mypy_path"], ["src"])
+        self.assertTrue(mypy["tool"]["mypy"]["explicit_package_bases"])
         self.assertFalse(pydoclint["tool"]["pydoclint"]["skip-checking-short-docstrings"])
         self.assertTrue(pydoclint["tool"]["pydoclint"]["check-class-attributes"])
         self.assertEqual(

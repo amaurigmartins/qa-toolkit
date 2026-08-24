@@ -21,6 +21,7 @@ from qa_toolkit.hook_deployment import (
 )
 from qa_toolkit.models import ConfigurationError, ConfigurationLink, Consumer, Profile
 from qa_toolkit.paths import toolkit_root
+from qa_toolkit.registry import executable_path, select_tools
 
 
 class DeploymentError(RuntimeError):
@@ -199,6 +200,119 @@ def _exclude_lines(profile: Profile) -> tuple[str, ...]:
     return tuple(lines)
 
 
+def _tool_link_records(root: Path, target: Path, profile: Profile) -> list[dict[str, str]]:
+    selected = select_tools(profile.tools, root)
+    counts: dict[str, int] = {}
+    for tool in selected:
+        for name in tool.asset.executables:
+            counts[name] = counts.get(name, 0) + 1
+    records: list[dict[str, str]] = []
+    aliases: set[str] = set()
+    for tool in selected:
+        primary = executable_path(tool, root)
+        for index, name in enumerate(tool.asset.executables):
+            source = primary.parent / name
+            if not source.is_file() or not os.access(source, os.X_OK):
+                raise DeploymentError(f"selected executable is unavailable: {tool.tool_id}:{name}")
+            alias = (
+                name
+                if counts[name] == 1
+                else tool.tool_id
+                if index == 0
+                else f"{tool.tool_id}-{name}"
+            )
+            if alias in aliases:
+                raise DeploymentError(f"selected executable alias is ambiguous: {alias}")
+            aliases.add(alias)
+            destination = target / ".qat" / "bin" / alias
+            records.append(
+                {
+                    "path": destination.relative_to(target).as_posix(),
+                    "tool": tool.tool_id,
+                    "executable": name,
+                    "target": _relative_link(source, destination),
+                }
+            )
+    return records
+
+
+def _tool_link_current(target: Path, item: dict[str, Any]) -> bool:
+    path = target / str(item["path"])
+    return (
+        path.is_symlink()
+        and os.readlink(path) == item["target"]
+        and path.is_file()
+        and os.access(path, os.X_OK)
+    )
+
+
+def _reconcile_tool_links(
+    target: Path,
+    root: Path,
+    profile: Profile,
+    previous: list[dict[str, Any]] | None = None,
+    *,
+    hard_reset: bool = False,
+) -> list[dict[str, str]]:
+    previous = previous or []
+    old = {str(item["path"]): item for item in previous}
+    expected = _tool_link_records(root, target, profile)
+    expected_paths = {item["path"] for item in expected}
+    for item in expected:
+        path_string = item["path"]
+        destination = target / path_string
+        prior = old.get(path_string)
+        if prior is None and (destination.exists() or destination.is_symlink()):
+            raise DeploymentError(f"refusing to replace foreign executable: {path_string}")
+        if prior is not None and not hard_reset and not _tool_link_current(target, prior):
+            raise DeploymentError(
+                f"modified managed executable requires --hard-reset: {path_string}"
+            )
+    for path_string, item in old.items():
+        if path_string in expected_paths:
+            continue
+        if not hard_reset and not _tool_link_current(target, item):
+            raise DeploymentError(
+                f"modified removed executable requires --hard-reset: {path_string}"
+            )
+    for path_string in old.keys() - expected_paths:
+        path = target / path_string
+        if path.exists() or path.is_symlink():
+            path.unlink()
+    for item in expected:
+        destination = target / item["path"]
+        if destination.exists() or destination.is_symlink():
+            destination.unlink()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.symlink_to(item["target"])
+    return expected
+
+
+def _remove_tool_links(
+    target: Path,
+    records: list[dict[str, Any]],
+    *,
+    backup: Path | None,
+    hard_reset: bool,
+) -> None:
+    modified = [item for item in records if not _tool_link_current(target, item)]
+    if modified and backup is None and not hard_reset:
+        raise DeploymentError(
+            "modified managed executables require --backup PATH or --hard-reset: "
+            + ", ".join(str(item["path"]) for item in modified)
+        )
+    if backup is not None:
+        for item in modified:
+            _backup_path(target, Path(str(item["path"])), backup)
+    for item in records:
+        path = target / str(item["path"])
+        if path.exists() or path.is_symlink():
+            path.unlink()
+    for directory in (target / ".qat" / "bin", target / ".qat"):
+        with contextlib.suppress(OSError):
+            directory.rmdir()
+
+
 def _skill_records(root: Path, target: Path, profile: Profile) -> list[dict[str, str]]:
     records = []
     for source_relative in profile.skills:
@@ -364,6 +478,7 @@ def enroll(
     consumer = load_consumer(target)
     profile = load_profile(consumer.profile, root)
     _validate_consumer_paths(target, consumer)
+    tool_links = _tool_link_records(root, target, profile)
     for configuration in profile.configurations:
         destination = target / configuration.destination
         if destination.exists() or destination.is_symlink():
@@ -376,9 +491,11 @@ def enroll(
     owned: list[dict[str, Any]] = []
     hooks: dict[str, Any] = {}
     skills: list[dict[str, str]] = []
+    executables: list[dict[str, str]] = []
     try:
         for configuration in profile.configurations:
             owned.append(_deploy_configuration(root, target, configuration, base_directory))
+        executables = _reconcile_tool_links(target, root, profile)
         hooks = reconcile_hooks(target, root, profile, adopt=adopt_hooks)
         skills = _reconcile_skills(target, root, profile)
         record = {
@@ -391,6 +508,7 @@ def enroll(
             "profile_digest": digest_profile(profile),
             "consumer_digest": digest_consumer(consumer),
             "owned": owned,
+            "executables": executables,
             "hooks": hooks,
             "skills": skills,
             "exclude": exclude,
@@ -402,6 +520,7 @@ def enroll(
             remove_hooks(target, hooks, backup=None, hard_reset=True)
         if skills:
             _remove_skills(target, root, skills, backup=None, hard_reset=True)
+        _remove_tool_links(target, tool_links, backup=None, hard_reset=True)
         for item in reversed(owned):
             path = target / item["path"]
             if path.exists() or path.is_symlink():
@@ -475,6 +594,21 @@ def status(target_value: Path, root: Path | None = None) -> dict[str, Any]:
         for item in record.get("skills", [])
     ]
     current = current and all(item["current"] for item in skills)
+    expected_executables = {
+        item["path"]: item for item in _tool_link_records(root, target, profile)
+    }
+    recorded_executables = {str(item["path"]): item for item in record.get("executables", [])}
+    executables = []
+    for path_string, expected in expected_executables.items():
+        recorded = recorded_executables.get(path_string)
+        valid = (
+            recorded == expected and recorded is not None and _tool_link_current(target, recorded)
+        )
+        executables.append({"path": path_string, "current": valid})
+        current = current and valid
+    for path_string in recorded_executables.keys() - expected_executables.keys():
+        executables.append({"path": path_string, "current": False})
+        current = False
     profile_current = record["profile_digest"] == digest_profile(profile)
     consumer_current = record["consumer_digest"] == digest_consumer(consumer)
     toolkit_current = record["toolkit_revision"] == _revision(root)
@@ -486,6 +620,7 @@ def status(target_value: Path, root: Path | None = None) -> dict[str, Any]:
         "consumer_current": consumer_current,
         "toolkit_current": toolkit_current,
         "paths": paths,
+        "executables": executables,
         "hooks": hooks,
         "skills": skills,
     }
@@ -605,6 +740,14 @@ def sync(
         if not valid:
             raise DeploymentError(f"modified removed path requires --hard-reset: {path_string}")
 
+    executables = _reconcile_tool_links(
+        target,
+        root,
+        profile,
+        old.get("executables", []),
+        hard_reset=hard_reset,
+    )
+
     for path_string in old_by_path.keys() - new_by_path.keys():
         path = target / path_string
         if path.exists() or path.is_symlink():
@@ -648,6 +791,7 @@ def sync(
         "profile_digest": digest_profile(profile),
         "consumer_digest": digest_consumer(consumer),
         "owned": [next_records[path] for path in new_by_path],
+        "executables": executables,
         "hooks": hooks,
         "skills": skills,
         "exclude": exclude,
@@ -696,6 +840,15 @@ def unenroll(
             "modified managed skills require --backup PATH or --hard-reset: "
             + ", ".join(str(item["path"]) for item in skill_modified)
         )
+    executable_records = record.get("executables", [])
+    executable_modified = [
+        item for item in executable_records if not _tool_link_current(target, item)
+    ]
+    if executable_modified and backup is None and not hard_reset:
+        raise DeploymentError(
+            "modified managed executables require --backup PATH or --hard-reset: "
+            + ", ".join(str(item["path"]) for item in executable_modified)
+        )
     if modified and backup is None and not hard_reset:
         raise DeploymentError(
             "modified managed paths require --backup PATH or --hard-reset: "
@@ -722,6 +875,13 @@ def unenroll(
         target,
         Path(str(record["toolkit_root"])),
         record.get("skills", []),
+        backup=backup,
+        hard_reset=hard_reset,
+    )
+
+    _remove_tool_links(
+        target,
+        executable_records,
         backup=backup,
         hard_reset=hard_reset,
     )
