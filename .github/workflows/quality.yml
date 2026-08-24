@@ -1,0 +1,24 @@
+name: qa-toolkit quality
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-toolkit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Ordinary quality and Julia 1.10.11 / 1.12.6
+    uses: ./.github/workflows/reusable-sentinel.yml
+    with:
+      toolkit_revision: ${{ github.event.pull_request.head.sha || github.sha }}
+      base_sha: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
+      retention_days: 14

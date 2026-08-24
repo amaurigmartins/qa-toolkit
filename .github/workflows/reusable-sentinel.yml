@@ -1,0 +1,113 @@
+name: Reusable qa-toolkit Sentinel
+
+on:
+  workflow_call:
+    inputs:
+      toolkit_revision:
+        description: Exact 40-character qa-toolkit commit to execute
+        required: true
+        type: string
+      base_sha:
+        description: Optional exact consumer base for commit validation
+        required: false
+        default: ""
+        type: string
+      variant:
+        description: Optional repository profile variant
+        required: false
+        default: ""
+        type: string
+      retention_days:
+        description: Evidence artifact retention
+        required: false
+        default: 14
+        type: number
+
+permissions:
+  contents: read
+
+jobs:
+  sentinel:
+    name: Exact-SHA Sentinel
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out consumer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          path: target
+          persist-credentials: false
+
+      - name: Validate immutable inputs
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+          QAT_VARIANT: ${{ inputs.variant }}
+          TOOLKIT_REVISION: ${{ inputs.toolkit_revision }}
+        run: |
+          test "${#TOOLKIT_REVISION}" -eq 40
+          case "$TOOLKIT_REVISION" in *[!0-9a-f]*) exit 2;; esac
+          if test -n "$BASE_SHA"; then
+            test "${#BASE_SHA}" -eq 40
+            case "$BASE_SHA" in *[!0-9a-f]*) exit 2;; esac
+          fi
+          case "$QAT_VARIANT" in *[!A-Za-z0-9._-]*) exit 2;; esac
+
+      - name: Check out exact qa-toolkit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: amaurigmartins/qa-toolkit
+          ref: ${{ inputs.toolkit_revision }}
+          fetch-depth: 0
+          path: toolkit
+          persist-credentials: false
+
+      - name: Verify exact revisions
+        env:
+          TOOLKIT_REVISION: ${{ inputs.toolkit_revision }}
+        run: |
+          test "$(git -C toolkit rev-parse HEAD)" = "$TOOLKIT_REVISION"
+          git -C target rev-parse HEAD
+
+      - name: Reconstruct central tools
+        run: ./bootstrap.sh
+        working-directory: toolkit
+
+      - name: Enroll consumer locally
+        run: ../toolkit/bin/qat repo enroll .
+        working-directory: target
+
+      - name: Verify tools and local deployment
+        run: |
+          ../toolkit/bin/qat tool status
+          ../toolkit/bin/qat repo status .
+          ../toolkit/bin/qat hook status .
+        working-directory: target
+
+      - name: Validate consumer commits
+        if: inputs.base_sha != ''
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+        run: ../toolkit/bin/qat commits --target . --range "$BASE_SHA..HEAD"
+        working-directory: target
+
+      - name: Run Sentinel once
+        env:
+          QAT_VARIANT: ${{ inputs.variant }}
+        run: |
+          if test -n "$QAT_VARIANT"; then
+            ../toolkit/bin/qat sentinel --target . --variant "$QAT_VARIANT"
+          else
+            ../toolkit/bin/qat sentinel --target .
+          fi
+        working-directory: target
+
+      - name: Upload complete evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qa-toolkit-evidence-${{ github.run_attempt }}
+          path: target/.git/qat/evidence
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: ${{ inputs.retention_days }}
