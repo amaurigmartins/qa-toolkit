@@ -1,0 +1,7 @@
+interface:
+  display_name: "Stage Work Item"
+  short_description: "Publish and bind one provisional task"
+  default_prompt: "Use $stage-work-item to stage and bind the accepted qa-toolkit work task."
+policy:
+  allow_implicit_invocation: false
+

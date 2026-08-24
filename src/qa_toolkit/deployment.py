@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -135,6 +136,18 @@ def _digest(path: Path) -> str:
     return _digest_bytes(path.read_bytes())
 
 
+def _tree_digest(path: Path) -> str:
+    hasher = hashlib.sha256()
+    for item in sorted(candidate for candidate in path.rglob("*") if candidate.is_file()):
+        relative = item.relative_to(path).as_posix().encode()
+        content = item.read_bytes()
+        hasher.update(len(relative).to_bytes(8, "big"))
+        hasher.update(relative)
+        hasher.update(len(content).to_bytes(8, "big"))
+        hasher.update(content)
+    return hasher.hexdigest()
+
+
 def _revision(repository: Path) -> str:
     value = _git(repository, ["rev-parse", "HEAD"]).stdout.strip()
     if len(value) != 40:
@@ -181,7 +194,91 @@ def _exclude_lines(profile: Profile) -> tuple[str, ...]:
     lines = [".qat/"]
     if any(hook.kind == "codex" for hook in profile.hooks):
         lines.extend((".codex/hooks.json", ".codex/hooks/"))
+    if profile.skills:
+        lines.append(".agents/skills/")
     return tuple(lines)
+
+
+def _skill_records(root: Path, target: Path, profile: Profile) -> list[dict[str, str]]:
+    records = []
+    for source_relative in profile.skills:
+        source = root / source_relative
+        destination = target / ".agents" / "skills" / source_relative.name
+        records.append(
+            {
+                "path": destination.relative_to(target).as_posix(),
+                "source": source_relative.as_posix(),
+                "target": _relative_link(source, destination),
+                "digest": _tree_digest(source),
+            }
+        )
+    return records
+
+
+def _skill_current(target: Path, root: Path, item: dict[str, Any]) -> bool:
+    path = target / str(item["path"])
+    source = root / str(item["source"])
+    return (
+        path.is_symlink()
+        and os.readlink(path) == item["target"]
+        and source.is_dir()
+        and _tree_digest(source) == item["digest"]
+    )
+
+
+def _reconcile_skills(
+    target: Path,
+    root: Path,
+    profile: Profile,
+    previous: list[dict[str, Any]] | None = None,
+    *,
+    hard_reset: bool = False,
+) -> list[dict[str, str]]:
+    previous = previous or []
+    old = {str(item["path"]): item for item in previous}
+    expected = _skill_records(root, target, profile)
+    expected_paths = {item["path"] for item in expected}
+    for path_string, item in old.items():
+        path = target / path_string
+        if not hard_reset and not _skill_current(target, root, item):
+            raise DeploymentError(f"modified managed skill requires --hard-reset: {path_string}")
+        if path_string not in expected_paths and (path.exists() or path.is_symlink()):
+            path.unlink()
+    for item in expected:
+        destination = target / item["path"]
+        if item["path"] not in old and (destination.exists() or destination.is_symlink()):
+            raise DeploymentError(f"refusing to replace foreign skill: {item['path']}")
+        if destination.exists() or destination.is_symlink():
+            destination.unlink()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.symlink_to(item["target"])
+    return expected
+
+
+def _remove_skills(
+    target: Path,
+    root: Path,
+    records: list[dict[str, Any]],
+    *,
+    backup: Path | None,
+    hard_reset: bool,
+) -> None:
+    modified = [item for item in records if not _skill_current(target, root, item)]
+    if modified and backup is None and not hard_reset:
+        raise DeploymentError(
+            "modified managed skills require --backup PATH or --hard-reset: "
+            + ", ".join(str(item["path"]) for item in modified)
+        )
+    if backup is not None:
+        for item in modified:
+            _backup_path(target, Path(str(item["path"])), backup)
+    for item in records:
+        path = target / str(item["path"])
+        if path.exists() or path.is_symlink():
+            path.unlink()
+    for directory in (target / ".agents" / "skills", target / ".agents"):
+        with contextlib.suppress(OSError):
+            directory.rmdir()
 
 
 def _reconcile_exclude(
@@ -275,10 +372,12 @@ def enroll(
     exclude = _exclude(target, _exclude_lines(profile))
     owned: list[dict[str, Any]] = []
     hooks: dict[str, Any] = {}
+    skills: list[dict[str, str]] = []
     try:
         for configuration in profile.configurations:
             owned.append(_deploy_configuration(root, target, configuration, base_directory))
         hooks = reconcile_hooks(target, root, profile, adopt=adopt_hooks)
+        skills = _reconcile_skills(target, root, profile)
         record = {
             "schema_version": 1,
             "toolkit_root": str(root),
@@ -290,6 +389,7 @@ def enroll(
             "consumer_digest": digest_consumer(consumer),
             "owned": owned,
             "hooks": hooks,
+            "skills": skills,
             "exclude": exclude,
         }
         _atomic_text(_record_path(target), f"{json.dumps(record, indent=2, sort_keys=True)}\n")
@@ -297,6 +397,8 @@ def enroll(
     except Exception:
         if hooks:
             remove_hooks(target, hooks, backup=None, hard_reset=True)
+        if skills:
+            _remove_skills(target, root, skills, backup=None, hard_reset=True)
         for item in reversed(owned):
             path = target / item["path"]
             if path.exists() or path.is_symlink():
@@ -358,6 +460,11 @@ def status(target_value: Path, root: Path | None = None) -> dict[str, Any]:
         current = current and valid
     hooks = hook_status(target, root, record.get("hooks", {}))
     current = current and hooks["current"]
+    skills = [
+        {"path": item["path"], "current": _skill_current(target, root, item)}
+        for item in record.get("skills", [])
+    ]
+    current = current and all(item["current"] for item in skills)
     profile_current = record["profile_digest"] == digest_profile(profile)
     consumer_current = record["consumer_digest"] == digest_consumer(consumer)
     toolkit_current = record["toolkit_revision"] == _revision(root)
@@ -370,6 +477,7 @@ def status(target_value: Path, root: Path | None = None) -> dict[str, Any]:
         "toolkit_current": toolkit_current,
         "paths": paths,
         "hooks": hooks,
+        "skills": skills,
     }
 
 
@@ -512,6 +620,13 @@ def sync(
         adopt=adopt_hooks,
         hard_reset=hard_reset,
     )
+    skills = _reconcile_skills(
+        target,
+        root,
+        profile,
+        old.get("skills", []),
+        hard_reset=hard_reset,
+    )
     exclude = _reconcile_exclude(target, old["exclude"], _exclude_lines(profile))
 
     record = {
@@ -524,6 +639,7 @@ def sync(
         "consumer_digest": digest_consumer(consumer),
         "owned": [next_records[path] for path in new_by_path],
         "hooks": hooks,
+        "skills": skills,
         "exclude": exclude,
     }
     _atomic_text(_record_path(target), f"{json.dumps(record, indent=2, sort_keys=True)}\n")
@@ -559,6 +675,17 @@ def unenroll(
         valid, _ = _owned_current(target, item)
         if not valid:
             modified.append(Path(item["path"]))
+    skill_records = record.get("skills", [])
+    skill_modified = [
+        item
+        for item in skill_records
+        if not _skill_current(target, Path(str(record["toolkit_root"])), item)
+    ]
+    if skill_modified and backup is None and not hard_reset:
+        raise DeploymentError(
+            "modified managed skills require --backup PATH or --hard-reset: "
+            + ", ".join(str(item["path"]) for item in skill_modified)
+        )
     if modified and backup is None and not hard_reset:
         raise DeploymentError(
             "modified managed paths require --backup PATH or --hard-reset: "
@@ -580,6 +707,14 @@ def unenroll(
         )
     except HookDeploymentError as error:
         raise DeploymentError(str(error)) from error
+
+    _remove_skills(
+        target,
+        Path(str(record["toolkit_root"])),
+        record.get("skills", []),
+        backup=backup,
+        hard_reset=hard_reset,
+    )
 
     for item in reversed(record["owned"]):
         path = target / item["path"]

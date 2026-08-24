@@ -1,0 +1,7 @@
+interface:
+  display_name: "Release Work Package"
+  short_description: "Prepare a separate calculated release"
+  default_prompt: "Use $release-work-package to calculate and prepare the separately authorized release task."
+policy:
+  allow_implicit_invocation: false
+

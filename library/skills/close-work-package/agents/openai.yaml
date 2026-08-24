@@ -1,0 +1,7 @@
+interface:
+  display_name: "Close Work Package"
+  short_description: "Finish Sentinel cleanup and retire state"
+  default_prompt: "Use $close-work-package to finish and retire the accepted cleanup task."
+policy:
+  allow_implicit_invocation: false
+

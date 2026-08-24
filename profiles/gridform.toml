@@ -8,7 +8,15 @@ tools = [
 ]
 configurations = []
 gates = []
-skills = []
+skills = [
+  "library/skills/plan-work-package",
+  "library/skills/stage-work-item",
+  "library/skills/execute-work-item",
+  "library/skills/reconcile-work-item",
+  "library/skills/run-work-package",
+  "library/skills/close-work-package",
+  "library/skills/release-work-package",
+]
 
 [[hooks]]
 kind = "git"

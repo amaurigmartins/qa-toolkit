@@ -374,9 +374,17 @@ def load_profile(name: str, root: Path | None = None) -> Profile:
         relative_path(item, f"{path}.skills")
         for item in string_list(value.get("skills"), f"{path}.skills")
     )
+    if len({item.name for item in skills}) != len(skills):
+        raise ConfigurationError(f"{path}.skills: duplicate deployed skill name")
     for skill in skills:
-        if not (repository / skill).is_dir():
+        source = repository / skill
+        if Path("library/skills") not in skill.parents:
+            raise ConfigurationError(f"{path}.skills: expected a library/skills directory")
+        if not source.is_dir() or source.is_symlink():
             raise ConfigurationError(f"{path}.skills: central skill does not exist: {skill}")
+        entry = source / "SKILL.md"
+        if not entry.is_file() or entry.is_symlink():
+            raise ConfigurationError(f"{path}.skills: skill has no ordinary SKILL.md: {skill}")
 
     return Profile(declared_name, tools, tuple(configurations), gates, tuple(hooks), skills, path)
 
@@ -469,6 +477,13 @@ def load_consumer(target: Path) -> Consumer:
     require_allowed = work.get("require_allowed_paths")
     if not isinstance(require_allowed, bool):
         raise ConfigurationError(f"{path}.work.require_allowed_paths: expected a boolean")
+    work_state = relative_path(
+        string(work, "state_directory", f"{path}.work"), f"{path}.work.state_directory"
+    )
+    if work_state.parts[:2] != (".git", "qat") or len(work_state.parts) < 3:
+        raise ConfigurationError(
+            f"{path}.work.state_directory: expected a directory below .git/qat"
+        )
 
     return Consumer(
         profile=string(value, "profile", str(path)),
@@ -481,9 +496,7 @@ def load_consumer(target: Path) -> Consumer:
         python=python_settings,
         gates=gates,
         protected_paths=protected,
-        work_state_directory=relative_path(
-            string(work, "state_directory", f"{path}.work"), f"{path}.work.state_directory"
-        ),
+        work_state_directory=work_state,
         work_require_allowed_paths=require_allowed,
         source=path,
     )

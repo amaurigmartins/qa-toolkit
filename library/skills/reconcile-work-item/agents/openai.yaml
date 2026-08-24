@@ -1,0 +1,7 @@
+interface:
+  display_name: "Reconcile Work Item"
+  short_description: "Recover exact task publication state"
+  default_prompt: "Use $reconcile-work-item to recover this qa-toolkit task from exact Git state."
+policy:
+  allow_implicit_invocation: false
+
