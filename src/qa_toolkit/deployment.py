@@ -47,6 +47,38 @@ def resolve_target(value: Path) -> Path:
     return target
 
 
+def tracked_entries(target: Path) -> tuple[tuple[str, str], ...]:
+    """Return tracked Git modes and paths without interpreting shell text."""
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(target), "ls-files", "--cached", "--stage", "-z"],
+            check=True,
+            capture_output=True,
+            timeout=30,
+            shell=False,
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise DeploymentError(f"cannot list tracked repository inputs: {error}") from error
+    result: list[tuple[str, str]] = []
+    for record in completed.stdout.split(b"\0"):
+        if not record:
+            continue
+        metadata, raw_path = record.split(b"\t", maxsplit=1)
+        mode = metadata.split(b" ", maxsplit=1)[0].decode("ascii")
+        result.append((mode, raw_path.decode("utf-8")))
+    return tuple(result)
+
+
+def tracked_regular_files(target: Path) -> tuple[str, ...]:
+    """Return tracked paths that currently resolve to ordinary files."""
+    result = []
+    for mode, path in tracked_entries(target):
+        candidate = target / path
+        if mode in {"100644", "100755"} and candidate.is_file() and not candidate.is_symlink():
+            result.append(path)
+    return tuple(sorted(result))
+
+
 def _tracked(target: Path, path: Path) -> bool:
     result = _git(target, ["ls-files", "--error-unmatch", "--", path.as_posix()], check=False)
     if result.returncode == 0:

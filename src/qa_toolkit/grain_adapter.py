@@ -14,7 +14,7 @@ from grain.runner import (  # type: ignore[import-untyped]
     run_checks,
 )
 
-from qa_toolkit.python_tools import _tracked_regular_files
+from qa_toolkit.deployment import tracked_regular_files
 
 
 def main(arguments: Sequence[str] | None = None) -> None:
@@ -24,7 +24,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
     options = parser.parse_args(arguments)
     files = [
         path
-        for path in _tracked_regular_files(Path.cwd())
+        for path in tracked_regular_files(Path.cwd())
         if path.endswith((".py", ".md", ".markdown"))
     ]
     violations = run_checks(files, load_config(options.config))

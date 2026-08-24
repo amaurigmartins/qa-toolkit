@@ -1,0 +1,4 @@
+always_for_in = true
+margin = 100
+remove_extra_newlines = true
+whitespace_typedefs = true

@@ -281,6 +281,13 @@ def _classification(gate: PlannedGate, exit_code: int) -> NormalizedResult:
     return "execution-error"
 
 
+def _julia_runtime(gate: PlannedGate) -> str | None:
+    try:
+        return gate.argv[gate.argv.index("--runtime") + 1]
+    except (ValueError, IndexError):
+        return None
+
+
 def execute(
     target_value: Path,
     mode: Literal["check", "sentinel", "advisory"],
@@ -359,6 +366,7 @@ def execute(
                 "execution_owner": gate.execution_owner,
                 "rule_source": gate.rule_source,
                 "environment": dict(gate.environment),
+                "julia_runtime": _julia_runtime(gate),
                 "result": result,
                 "exit_code": exit_code,
                 "stdout": stdout_path.name,
@@ -392,6 +400,7 @@ def execute(
                 "execution_owner": gate.execution_owner,
                 "rule_source": gate.rule_source,
                 "environment": dict(gate.environment),
+                "julia_runtime": _julia_runtime(gate),
             }
             for gate in plan
         ],

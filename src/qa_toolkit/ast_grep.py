@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path, PurePosixPath
 
+from qa_toolkit.deployment import DeploymentError, tracked_regular_files
 from qa_toolkit.models import Consumer, Gate
-from qa_toolkit.python_tools import _tracked_regular_files
 
 _RULE_ID = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 _YAML_SUFFIXES = frozenset({".yaml", ".yml"})
@@ -60,8 +60,8 @@ def resolve_ast_grep(consumer: Consumer, *, target: Path, root: Path) -> Resolve
 
 def _tracked_consumer_inputs(target: Path) -> set[str]:
     try:
-        return set(_tracked_regular_files(target))
-    except (OSError, UnicodeError) as exc:
+        return set(tracked_regular_files(target))
+    except (DeploymentError, OSError, UnicodeError) as exc:
         raise AstGrepPolicyError(str(exc)) from exc
 
 

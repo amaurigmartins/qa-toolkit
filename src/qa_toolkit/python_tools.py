@@ -7,13 +7,13 @@ import hashlib
 import json
 import os
 import shutil
-import subprocess
 import tempfile
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from qa_toolkit.deployment import tracked_regular_files
 from qa_toolkit.models import (
     Consumer,
     Gate,
@@ -57,31 +57,8 @@ _OWNED_EXECUTABLES = frozenset(
 _CONFIG_NAMES = ("ruff", "mypy", "pylint", "pydoclint", "coverage", "vulture", "grain")
 
 
-def _tracked_regular_files(target: Path) -> tuple[str, ...]:
-    completed = subprocess.run(
-        ["git", "-C", str(target), "ls-files", "--cached", "--stage", "-z"],
-        check=True,
-        capture_output=True,
-        timeout=30,
-        shell=False,
-    )
-    result: list[str] = []
-    for record in completed.stdout.split(b"\0"):
-        if not record:
-            continue
-        metadata, raw_path = record.split(b"\t", maxsplit=1)
-        mode = metadata.split(b" ", maxsplit=1)[0]
-        if mode not in {b"100644", b"100755"}:
-            continue
-        path = raw_path.decode("utf-8")
-        candidate = target / path
-        if candidate.is_file() and not candidate.is_symlink():
-            result.append(path)
-    return tuple(sorted(result))
-
-
 def _validate_scope(consumer: Consumer, target: Path) -> None:
-    tracked = _tracked_regular_files(target)
+    tracked = tracked_regular_files(target)
     overlays = (consumer.python.ruff, consumer.python.pylint, consumer.python.pydoclint)
     selected_paths = tuple(path for overlay in overlays if overlay for path in overlay.paths)
     missing = sorted(
@@ -319,7 +296,7 @@ def _import_linter_gate(target: Path, consumer: Consumer) -> tuple[Gate, str] | 
         or not all(isinstance(item, dict) and item for item in contracts)
     ):
         raise PythonToolError("Import Linter settings require non-empty direction rules")
-    if relative.as_posix() not in _tracked_regular_files(target):
+    if relative.as_posix() not in tracked_regular_files(target):
         raise PythonToolError("Import Linter settings must use a tracked pyproject.toml")
     digest = hashlib.sha256(
         json.dumps(settings, sort_keys=True, separators=(",", ":")).encode()

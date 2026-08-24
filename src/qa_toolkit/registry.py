@@ -11,6 +11,7 @@ import stat
 import subprocess
 import tarfile
 import tempfile
+import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -210,6 +211,9 @@ def executable_path(tool: Tool, root: Path | None = None) -> Path:
 
 def tool_status(tool: Tool, root: Path | None = None) -> tuple[bool, str]:
     """Return whether the installed primary executable reports the accepted version."""
+    repository = root or toolkit_root()
+    if tool.environment == "julia":
+        return _julia_package_status(tool, repository)
     executable = executable_path(tool, root)
     if not executable.is_file() or not os.access(executable, os.X_OK):
         return False, "missing"
@@ -233,6 +237,49 @@ def tool_status(tool: Tool, root: Path | None = None) -> tuple[bool, str]:
     if tool.version_contains not in output:
         return False, f"version-mismatch: {output.splitlines()[0] if output else 'empty output'}"
     return True, tool.version
+
+
+def _julia_package_status(tool: Tool, root: Path) -> tuple[bool, str]:
+    source = root / "config" / "julia"
+    qa = payload_root(root) / "julia" / "qa"
+    return _julia_package_status_at(tool, source, qa)
+
+
+def _julia_package_status_at(tool: Tool, source: Path, qa: Path) -> tuple[bool, str]:
+    for minor in ("1.10", "1.12"):
+        active = qa / minor
+        project = active / "environment" / "Project.toml"
+        manifest = active / "environment" / "Manifest.toml"
+        expected_manifest = source / "locks" / minor / "Manifest.toml"
+        if not project.is_file() or not manifest.is_file():
+            return False, f"missing Julia {minor} QA environment"
+        if project.read_bytes() != (source / "Project.toml").read_bytes():
+            return False, f"Julia {minor} QA project mismatch"
+        if manifest.read_bytes() != expected_manifest.read_bytes():
+            return False, f"Julia {minor} QA manifest mismatch"
+        document = tomllib.loads(manifest.read_text(encoding="utf-8"))
+        packages = document.get("deps", {})
+        records = (
+            packages.get(_julia_package_name(tool.tool_id), [])
+            if isinstance(packages, dict)
+            else []
+        )
+        if not isinstance(records, list) or not any(
+            isinstance(record, dict) and record.get("version") == tool.version for record in records
+        ):
+            return False, f"Julia {minor} manifest version mismatch"
+        package_root = active / "depot" / "packages" / _julia_package_name(tool.tool_id)
+        if not package_root.is_dir() or not any(item.is_dir() for item in package_root.iterdir()):
+            return False, f"Julia {minor} package source missing"
+    return True, tool.version
+
+
+def _julia_package_name(identifier: str) -> str:
+    return {
+        "aqua": "Aqua",
+        "explicitimports": "ExplicitImports",
+        "juliaformatter": "JuliaFormatter",
+    }[identifier]
 
 
 def _download(url: str, destination: Path) -> None:
@@ -531,13 +578,60 @@ def _install_julia_runtime(tool: Tool, root: Path) -> None:
             shutil.rmtree(work)
 
 
+def _install_julia_qa(root: Path) -> None:
+    runtimes = select_tools(["julia-1.10.11", "julia-1.12.6"], root)
+    if not all(tool_status(tool, root)[0] for tool in runtimes):
+        raise RegistryError("Julia QA packages require both accepted runtimes")
+    staging_root = payload_root(root) / ".staging"
+    staging_root.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix="julia-qa-", dir=staging_root))
+    staged = work / "qa"
+    try:
+        for runtime, minor in zip(runtimes, ("1.10", "1.12"), strict=True):
+            environment_root = staged / minor
+            project = environment_root / "environment"
+            depot = environment_root / "depot"
+            project.mkdir(parents=True)
+            depot.mkdir()
+            shutil.copy2(root / "config/julia/Project.toml", project / "Project.toml")
+            shutil.copy2(
+                root / "config" / "julia" / "locks" / minor / "Manifest.toml",
+                project / "Manifest.toml",
+            )
+            process_environment = os.environ.copy()
+            process_environment.update(
+                {
+                    "JULIA_DEPOT_PATH": str(depot),
+                    "JULIA_HISTORY": os.devnull,
+                    "JULIA_PKG_PRECOMPILE_AUTO": "0",
+                }
+            )
+            _run(
+                [
+                    str(executable_path(runtime, root)),
+                    "--startup-file=no",
+                    "--history-file=no",
+                    "--color=no",
+                    f"--project={project}",
+                    str(root / "config/julia/scripts/instantiate.jl"),
+                ],
+                environment=process_environment,
+            )
+        for tool in select_tools(["juliaformatter", "aqua", "explicitimports"], root):
+            valid, detail = _julia_package_status_at(tool, root / "config/julia", staged)
+            if not valid:
+                raise RegistryError(f"{tool.tool_id}: staged Julia QA check failed: {detail}")
+        _replace_directory(staged, payload_root(root) / "julia" / "qa")
+    finally:
+        if work.exists():
+            shutil.rmtree(work)
+
+
 def fetch_environment(environment: str, root: Path | None = None, *, force: bool = False) -> None:
     """Install one shared locked ecosystem environment atomically."""
     repository = root or toolkit_root()
     tools = tuple(tool for tool in load_registry(repository) if tool.environment == environment)
-    current = bool(tools) and all(
-        tool_status(tool, repository)[0] for tool in tools if tool.asset.executables
-    )
+    current = bool(tools) and all(tool_status(tool, repository)[0] for tool in tools)
     if current and not force:
         return
     if environment == "python":
@@ -549,6 +643,8 @@ def fetch_environment(environment: str, root: Path | None = None, *, force: bool
         if runtime is None:
             raise RegistryError(f"missing runtime record for {environment}")
         _install_julia_runtime(runtime, repository)
+    elif environment == "julia":
+        _install_julia_qa(repository)
     else:
         raise RegistryError(f"unsupported environment: {environment}")
 
@@ -563,9 +659,8 @@ def fetch_tool(tool: Tool, root: Path | None = None, *, force: bool = False) -> 
         _install_asset(tool, repository)
         return
     if tool.environment == "julia":
-        raise RegistryError(
-            f"{tool.tool_id}: Julia QA packages are installed by the Julia environment"
-        )
+        fetch_environment("julia", repository, force=force)
+        return
     fetch_environment(tool.environment, repository, force=force)
 
 

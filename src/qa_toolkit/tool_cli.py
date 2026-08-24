@@ -79,8 +79,6 @@ def _fetch(identifiers: Sequence[str], fetch_all: bool, force: bool) -> int:
     tools = load_registry() if fetch_all else select_tools(identifiers)
     handled_environments: set[str] = set()
     for tool in tools:
-        if tool.environment == "julia":
-            continue
         if tool.environment in handled_environments:
             continue
         fetch_tool(tool, force=force)
