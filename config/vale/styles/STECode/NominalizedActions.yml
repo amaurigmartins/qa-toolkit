@@ -1,0 +1,9 @@
+extends: existence
+message: "Use a direct verb instead of the nominalized action in '%s'."
+level: error
+ignorecase: true
+tokens:
+  - '\b(?:perform|execute|do|carry out) (?:an?|the) (?:installation|initialization|validation|verification|retrieval|calculation|computation|evaluation|measurement|comparison|conversion|normalization|optimization|configuration|implementation|execution|investigation|assessment|inspection|removal|selection|reduction|modification|transformation|allocation|deallocation|migration|testing) of\b'
+  - '\beffect (?:an?|the) (?:retrieval|removal|reduction|change|conversion) of\b'
+  - '\bgive(?:s)? an indication of\b'
+  - '\bmake(?:s)? (?:an?|the) (?:comparison|calculation|measurement|selection) of\b'

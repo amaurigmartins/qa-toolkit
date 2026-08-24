@@ -1,0 +1,11 @@
+extends: existence
+message: "Write the complete form of '%s'."
+level: error
+ignorecase: true
+tokens:
+  - '\b(?:aren''t|can''t|couldn''t|didn''t|doesn''t|don''t|hadn''t|hasn''t|haven''t|isn''t|mustn''t|shouldn''t|wasn''t|weren''t|won''t|wouldn''t)\b'
+  - '\b(?:it''s|that''s|there''s|they''re|we''re|what''s|who''s|you''re)\b'
+  - '\b(?:here''s|how''s|I''d|I''ll|I''m|I''ve|let''s|she''d|she''ll|she''s|they''d|they''ll|they''ve|we''d|we''ll|we''ve|where''s|when''s|why''s|you''d|you''ll|you''ve)\b'
+  - '\b(?:aren’t|can’t|couldn’t|didn’t|doesn’t|don’t|hadn’t|hasn’t|haven’t|isn’t|mustn’t|shouldn’t|wasn’t|weren’t|won’t|wouldn’t)\b'
+  - '\b(?:it’s|that’s|there’s|they’re|we’re|what’s|who’s|you’re)\b'
+  - '\b(?:here’s|how’s|I’d|I’ll|I’m|I’ve|let’s|she’d|she’ll|she’s|they’d|they’ll|they’ve|we’d|we’ll|we’ve|where’s|when’s|why’s|you’d|you’ll|you’ve)\b'

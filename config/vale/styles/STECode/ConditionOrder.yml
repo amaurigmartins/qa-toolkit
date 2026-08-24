@@ -1,0 +1,7 @@
+extends: existence
+message: "Put the condition before the command in '%s'."
+level: warning
+scope: sentence
+ignorecase: false
+tokens:
+  - '^(?:Add|Apply|Build|Call|Change|Check|Close|Compile|Compute|Connect|Convert|Copy|Create|Delete|Do|Edit|Enter|Get|Initialize|Install|Keep|Make|Move|Open|Parse|Put|Read|Remove|Replace|Run|Select|Send|Set|Start|Stop|Test|Update|Use|Validate|Write)\b[^.!?]+\b(?:if|unless|when)\b'

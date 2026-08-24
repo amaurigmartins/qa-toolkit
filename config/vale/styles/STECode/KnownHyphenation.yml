@@ -1,0 +1,12 @@
+extends: existence
+message: "Check the STE-Code hyphenation of '%s'."
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:read only|write only)[[:space:]]+(?:access|descriptor|file|input|mode|output|property|view)\b'
+  - '\bthread safe[[:space:]]+(?:cache|component|function|implementation|queue|routine|singleton|type)\b'
+  - '\bevent driven[[:space:]]+(?:algorithm|analysis|architecture|execution|model|routine|system|workflow)\b'
+  - '\b(?:client side|server side)[[:space:]]+(?:analysis|calculation|code|component|execution|function|rendering|routine|validation)\b'
+  - '\b(?:end to end|backward compatible|low latency|build time|run time|request response|out of band|long running)[[:space:]]+[[:alpha:]-]+\b'
+  - '\b(?:dry run|hot reload|cold start|hard code|soft delete|short circuit)[[:space:]]+[[:alpha:]-]+\b'
+  - '\b[[:digit:]]+[[:space:]]+(?:bit|byte)[[:space:]]+(?:address|field|integer|offset|quantity|value|word)\b'

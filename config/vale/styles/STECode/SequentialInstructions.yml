@@ -1,0 +1,7 @@
+extends: existence
+message: "Put each sequential instruction in a separate sentence instead of using '%s'."
+level: error
+ignorecase: true
+tokens:
+  - '\band then\b'
+  - '\bfirst\b[^.!?]+\bsecond\b[^.!?]+\b(?:third|finally)\b'

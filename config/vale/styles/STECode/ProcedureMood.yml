@@ -1,0 +1,7 @@
+extends: existence
+message: "Check whether the list item should start with a direct imperative instead of '%s'."
+level: warning
+scope: list
+ignorecase: false
+tokens:
+  - '^(?:You|We|The (?:reader|user|operator))\s+(?:can|must|shall|should|will|would)\b'

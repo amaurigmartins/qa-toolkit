@@ -305,8 +305,40 @@ def digest_profile(profile: Profile) -> str:
 
 
 def digest_consumer(consumer: Consumer) -> str:
-    """Return the digest of the exact tracked consumer declaration bytes."""
-    return hashlib.sha256(consumer.source.read_bytes()).hexdigest()
+    """Return the digest of the declaration and every declared rule input."""
+    target = consumer.source.parent
+    selected = [consumer.source.relative_to(target), *consumer.native_configurations]
+    selected.extend(
+        path
+        for path in (
+            consumer.vocabulary_file,
+            consumer.ast_grep_config,
+            consumer.ast_grep_tests,
+        )
+        if path is not None
+    )
+    for gate in consumer.gates:
+        command = Path(gate.argv[0])
+        if not command.is_absolute() and len(command.parts) > 1 and (target / command).exists():
+            selected.append(command)
+    hasher = hashlib.sha256()
+    files: set[Path] = set()
+    for relative in selected:
+        path = target / relative
+        if path.is_dir():
+            files.update(
+                item for item in path.rglob("*") if item.is_file() and not item.is_symlink()
+            )
+        elif path.is_file():
+            files.add(path)
+    for path in sorted(files):
+        relative_bytes = path.relative_to(target).as_posix().encode()
+        hasher.update(len(relative_bytes).to_bytes(8, "big"))
+        hasher.update(relative_bytes)
+        content = path.read_bytes()
+        hasher.update(len(content).to_bytes(8, "big"))
+        hasher.update(content)
+    return hasher.hexdigest()
 
 
 def profile_summary(profile: Profile) -> str:

@@ -1,0 +1,6 @@
+extends: occurrence
+message: "Check whether this procedural list item exceeds the 20-word STE-Code limit."
+level: warning
+scope: list
+max: 20
+token: '(?:\([^()\n]*\)|"[^"\n]*"|\b[[:digit:]]+(?:\.[[:digit:]]+)?[[:space:]]*(?:%|ns|us|ms|s|Hz|kHz|MHz|GHz|B|KB|MB|GB|KiB|MiB|GiB|mm|cm|km)\b|\b[[:alnum:]][[:alnum:]_./:+-]*\b)'

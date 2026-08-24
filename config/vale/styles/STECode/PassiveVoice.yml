@@ -1,0 +1,8 @@
+extends: existence
+message: "Check whether '%s' hides the actor or computational operation."
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:am|is|are|was|were|be|been|being|get|gets|got)\s+(?:[[:alpha:]-]+\s+){0,2}[[:alpha:]-]+(?:ed|en)\b'
+  - '\b(?:am|is|are|was|were|be|been|being|get|gets|got)\s+(?:built|done|found|given|kept|known|made|read|run|sent|shown|written)\b'
+  - '\b(?:can|may|must|shall|should|will|would)\s+be\s+(?:[[:alpha:]-]+\s+){0,2}(?:[[:alpha:]-]+(?:ed|en)|built|done|found|given|kept|known|made|read|run|sent|shown|written)\b'

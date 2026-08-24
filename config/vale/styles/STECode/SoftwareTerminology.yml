@@ -1,0 +1,26 @@
+extends: existence
+message: "Name the computational responsibility or numerical operation instead of '%s'."
+level: error
+ignorecase: true
+tokens:
+  - '\bbusiness rules?\b'
+  - '\bcontracts?\b'
+  - '\borchestration platforms?\b'
+  - '\borchestration layers?\b'
+  - '\bservice layers?\b'
+  - '\bmicroservices?\b'
+  - '\bmiddleware\b'
+  - '\bbackends?\b'
+  - '\bfrontends?\b'
+  - '\bpipeline architectures?\b'
+  - '\bdeployment stacks?\b'
+  - '\benterprise frameworks?\b'
+  - '\bscalable platforms?\b'
+  - '\bcloud-native\b'
+  - '\bproduction-ready\b'
+  - '\bservice abstractions?\b'
+  - '\banalytical services?\b'
+  - '\bKPI engines?\b'
+  - '\bplugin ecosystems?\b'
+  - '\bbusiness logic\b'
+  - '\btechnology stacks?\b'

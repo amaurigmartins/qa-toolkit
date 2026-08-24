@@ -1,0 +1,8 @@
+extends: existence
+message: "Write the STE-Code safety signal as uppercase LABEL, one colon, one space, and uppercase instruction text; found '%s'."
+level: error
+nonword: true
+tokens:
+  - '\b(?:Warning|warning|Caution|caution|Note|note):'
+  - '\b(?:WARNING|CAUTION|NOTE):(?:[^[:space:]]|[[:space:]]{2,})'
+  - '\b(?:WARNING|CAUTION|NOTE):[[:space:]]+[[:lower:]]'

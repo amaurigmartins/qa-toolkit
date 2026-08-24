@@ -1,0 +1,7 @@
+---
+extends: existence
+message: "AI punctuation: en dash detected. Check whether it marks a range or compound name."
+level: warning
+nonword: true
+tokens:
+  - '–'

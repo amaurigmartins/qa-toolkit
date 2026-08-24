@@ -1,0 +1,10 @@
+extends: existence
+message: "Replace the informal or vague term '%s' with the named object or operation."
+level: error
+ignorecase: true
+tokens:
+  - '\bthings?\b'
+  - '\bstuff\b'
+  - '\bquick[- ]and[- ]dirty\b'
+  - '\bhack(?:s|ed|ing)? (?:a|the|this|that) (?:config|configuration)\b'
+  - '\b(?:somehow|whatever)\b'

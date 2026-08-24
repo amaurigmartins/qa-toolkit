@@ -1,0 +1,7 @@
+extends: existence
+message: "Replace the prose semicolon with separate sentences or a list."
+level: error
+scope: sentence
+nonword: true
+tokens:
+  - ';'

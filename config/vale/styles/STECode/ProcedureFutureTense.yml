@@ -1,0 +1,7 @@
+extends: existence
+message: "Check whether the procedural list item should use a present or imperative form instead of '%s'."
+level: warning
+scope: list
+ignorecase: true
+tokens:
+  - '\bwill\b'

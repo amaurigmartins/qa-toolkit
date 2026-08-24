@@ -1,0 +1,7 @@
+extends: existence
+message: "Use WARNING, CAUTION, or NOTE instead of the non-STE label '%s'."
+level: error
+ignorecase: true
+nonword: true
+tokens:
+  - '\b(?:DANGER|IMPORTANT|ATTENTION|BE CAREFUL|HEADS UP|WATCH OUT)[[:space:]]*:'

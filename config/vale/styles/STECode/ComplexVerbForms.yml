@@ -1,0 +1,8 @@
+extends: existence
+message: "Replace the complex verb form '%s' with an approved simple tense."
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:have|has|had)\s+(?:already\s+)?(?:been\s+)?(?:built|closed|compiled|completed|connected|created|decoded|deployed|deserialized|dispatched|done|encoded|found|formatted|handled|initialized|inserted|kept|linted|made|migrated|opened|parsed|published|pushed|read|received|removed|resolved|routed|run|scheduled|sent|serialized|set|shown|started|stopped|streamed|subscribed|tested|validated|written)\b'
+  - '\b(?:am|is|are|was|were|be|been|being|will be|has been|have been|had been)\s+(?!(?:logging|monitoring|routing|servicing|matching|missing|remaining)\b)[[:alpha:]][[:alpha:]-]*ing\b'
+  - '\b(?:can|may|must|shall|should|will|would|is to|are to|was to|were to)\s+be\s+(?:[[:alpha:]-]+(?:ed|en)|built|done|found|given|kept|known|made|read|run|sent|shown|written)\b'
