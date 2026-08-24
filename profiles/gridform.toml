@@ -228,7 +228,7 @@ execution_error_exit_codes = [2]
 [[gates]]
 id = "python-dependencies"
 phase = "sentinel"
-argv = ["{tool:pip-audit}", "--locked", "--cache-dir", ".git/qat/cache/pip-audit", "--progress-spinner", "off", "."]
+argv = ["{tool:pip-audit}", "--path", ".venv/lib/python3.11/site-packages", "--skip-editable", "--cache-dir", ".git/qat/cache/pip-audit", "--progress-spinner", "off"]
 triggers = ["pyproject.toml", "uv.lock"]
 timeout = 600
 severity = "blocking"
