@@ -17,6 +17,11 @@ on:
         required: false
         default: ""
         type: string
+      setup_path:
+        description: Optional tracked executable consumer setup path
+        required: false
+        default: ""
+        type: string
       retention_days:
         description: Evidence artifact retention
         required: false
@@ -42,6 +47,7 @@ jobs:
         env:
           BASE_SHA: ${{ inputs.base_sha }}
           QAT_VARIANT: ${{ inputs.variant }}
+          CONSUMER_SETUP: ${{ inputs.setup_path }}
           TOOLKIT_REVISION: ${{ inputs.toolkit_revision }}
         run: |
           test "${#TOOLKIT_REVISION}" -eq 40
@@ -51,6 +57,10 @@ jobs:
             case "$BASE_SHA" in *[!0-9a-f]*) exit 2;; esac
           fi
           case "$QAT_VARIANT" in *[!A-Za-z0-9._-]*) exit 2;; esac
+          case "$CONSUMER_SETUP" in
+            "") ;;
+            /*|../*|*/../*|*/..|*\\*) exit 2;;
+          esac
 
       - name: Check out exact qa-toolkit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -85,6 +95,17 @@ jobs:
           ../toolkit/bin/qat tool status
           ../toolkit/bin/qat repo status .
           ../toolkit/bin/qat hook status .
+        working-directory: target
+
+      - name: Prepare consumer runtime
+        if: inputs.setup_path != ''
+        env:
+          CONSUMER_SETUP: ${{ inputs.setup_path }}
+        run: |
+          git ls-files --error-unmatch -- "$CONSUMER_SETUP"
+          test -f "$CONSUMER_SETUP"
+          test -x "$CONSUMER_SETUP"
+          "$GITHUB_WORKSPACE/target/$CONSUMER_SETUP"
         working-directory: target
 
       - name: Validate consumer commits
