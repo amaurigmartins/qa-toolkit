@@ -10,7 +10,7 @@ from pathlib import Path
 
 from test_deployment import _git
 
-from qa_toolkit.deployment import enroll
+from qa_toolkit.deployment import enroll, sync
 from qa_toolkit.text_tools import run_cspell, run_vale
 
 ROOT = Path(__file__).parents[1]
@@ -132,6 +132,38 @@ class TextToolAcceptanceTests(unittest.TestCase):
             self.assertIn("sample.py:2", rendered)
             self.assertIn("sample.jl:1", rendered)
             self.assertNotIn("README.md:3", rendered)
+
+    def test_vale_prose_include_scans_only_matching_tracked_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = _consumer(Path(directory))
+            declaration = target / ".qat.toml"
+            declaration.write_text(
+                declaration.read_text(encoding="utf-8")
+                + '\n[text.prose]\ninclude = ["**/*.tex"]\n',
+                encoding="utf-8",
+            )
+            (target / "README.md").write_text("Let's unpack the business rule.\n", encoding="utf-8")
+            (target / "guide.tex").write_text(
+                "\\section{Method}\nThe middleware converts the value.\n",
+                encoding="utf-8",
+            )
+            _git(target, "add", "-A")
+            sync(target, ROOT)
+
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                code = run_vale(target)
+
+            rendered = output.getvalue()
+            self.assertEqual(code, 1)
+            self.assertIn("guide.tex:2", rendered)
+            self.assertNotIn("README.md", rendered)
+
+            advisory_output = io.StringIO()
+            with contextlib.redirect_stdout(advisory_output):
+                advisory_code = run_vale(target, advisory=True)
+            self.assertEqual(advisory_code, 0)
+            self.assertNotIn("README.md", advisory_output.getvalue())
 
     def test_vale_directive_detection_is_limited_to_reader_text(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

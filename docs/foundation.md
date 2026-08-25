@@ -2,7 +2,7 @@
 
 ## Boundary
 
-qa-toolkit is a private Linux x86_64 toolkit. It keeps every downloaded runtime and quality tool
+qa-toolkit is a Linux x86_64 toolkit. It keeps every downloaded runtime and quality tool
 under this repository's ignored `toolkit/` directory. An optional `~/.local/bin/qat` symlink may
 point to the tracked launcher. The bootstrap writes no other path outside this repository.
 
@@ -49,6 +49,7 @@ configuration, hook, skill, and ordered gate. The consumer file may add bounded 
 - A Python project path and stricter typed Ruff, MyPy, Pylint, or Pydoclint settings.
 - A tracked ast-grep configuration and rule-test directory.
 - A tracked vocabulary file, additions, and path-bounded allowances.
+- Bounded tracked-path selection for prose analysis, such as `**/*.tex` for LaTeX-only input.
 - Tracked additive argument-array gates, including an opaque live-test command.
 - Protected paths and structured work-package settings.
 
@@ -148,8 +149,7 @@ state, global modes, session history, transcript handling, cross-repository brea
 consumer dependency installation. It does not copy another repository's Git history.
 
 Users can disable these repository guardrails. They do not provide host containment. CI remains
-authoritative for merge acceptance. The toolkit supports only Linux x86_64. The project makes no
-public stability or third-party support promise.
+authoritative for merge acceptance. The toolkit supports only Linux x86_64.
 
 ## Foundation audit
 

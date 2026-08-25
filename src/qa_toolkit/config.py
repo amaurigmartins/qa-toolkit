@@ -19,6 +19,7 @@ from qa_toolkit.models import (
     Hook,
     MypySettings,
     Profile,
+    ProseSettings,
     PydoclintSettings,
     PylintSettings,
     PythonException,
@@ -26,6 +27,7 @@ from qa_toolkit.models import (
     PythonTool,
     RuffSettings,
     RuffThresholds,
+    TextSettings,
     closed_keys,
     relative_path,
     string,
@@ -95,6 +97,21 @@ def _python_paths(value: object, context: str) -> tuple[str, ...]:
         ):
             raise ConfigurationError(f"{context}: expected bounded repository paths")
     return paths
+
+
+def _repository_patterns(value: object, context: str) -> tuple[str, ...]:
+    patterns = _unique_strings(value, context)
+    for item in patterns:
+        path = PurePosixPath(item)
+        if (
+            path.is_absolute()
+            or item != path.as_posix()
+            or not path.parts
+            or ".." in path.parts
+            or "\\" in item
+        ):
+            raise ConfigurationError(f"{context}: expected bounded repository patterns")
+    return patterns
 
 
 def _ruff_settings(value: object, context: str) -> RuffSettings:
@@ -445,6 +462,7 @@ def load_consumer(target: Path) -> Consumer:
             "vocabulary",
             "ast_grep",
             "python",
+            "text",
             "gates",
             "protected_paths",
             "work",
@@ -499,6 +517,22 @@ def load_consumer(target: Path) -> Consumer:
         exceptions=_python_exceptions(python.get("exceptions", []), f"{path}.python.exceptions"),
     )
 
+    text = value.get("text", {})
+    if not isinstance(text, dict):
+        raise ConfigurationError(f"{path}.text: expected a table")
+    closed_keys(text, {"prose"}, f"{path}.text")
+    prose = text.get("prose", {})
+    if not isinstance(prose, dict):
+        raise ConfigurationError(f"{path}.text.prose: expected a table")
+    closed_keys(prose, {"include"}, f"{path}.text.prose")
+    prose_include: tuple[str, ...] = ()
+    if "prose" in text:
+        if "include" not in prose:
+            raise ConfigurationError(f"{path}.text.prose.include: expected a non-empty array")
+        prose_include = _repository_patterns(prose["include"], f"{path}.text.prose.include")
+        if not prose_include:
+            raise ConfigurationError(f"{path}.text.prose.include: expected a non-empty array")
+
     gates = tuple(
         _gate(raw, f"{path}.gates[{index}]", consumer=True)
         for index, raw in enumerate(_table_array(value.get("gates", []), f"{path}.gates"))
@@ -536,6 +570,7 @@ def load_consumer(target: Path) -> Consumer:
         work_state_directory=work_state,
         work_require_allowed_paths=require_allowed,
         source=path,
+        text=TextSettings(prose=ProseSettings(include=prose_include)),
     )
 
 

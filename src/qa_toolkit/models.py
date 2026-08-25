@@ -88,6 +88,20 @@ class PythonSettings:
     exceptions: tuple[PythonException, ...] = ()
 
 
+@dataclass(frozen=True)
+class ProseSettings:
+    """Tracked repository paths selected for prose analysis."""
+
+    include: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class TextSettings:
+    """Typed consumer settings for text analysis."""
+
+    prose: ProseSettings = ProseSettings()
+
+
 def closed_keys(value: dict[str, Any], allowed: set[str], context: str) -> None:
     """Reject keys outside a closed schema."""
     unknown = set(value) - allowed
@@ -199,3 +213,4 @@ class Consumer:
     work_state_directory: Path
     work_require_allowed_paths: bool
     source: Path
+    text: TextSettings = TextSettings()

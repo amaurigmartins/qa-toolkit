@@ -188,6 +188,12 @@ class TextCommandBoundaryTests(unittest.TestCase):
                 "qa_toolkit.text_tools.build_corpus",
                 return_value=("digest", Path("/generated")),
             ),
+            patch(
+                "qa_toolkit.text_tools.load_consumer",
+                return_value=SimpleNamespace(
+                    text=SimpleNamespace(prose=SimpleNamespace(include=()))
+                ),
+            ),
             patch("qa_toolkit.text_tools._source_paths", return_value=()),
         ):
             self.assertEqual(run_vale(Path(".")), 0)
@@ -205,6 +211,12 @@ class TextCommandBoundaryTests(unittest.TestCase):
         common = (
             patch("qa_toolkit.text_tools.resolve_target", return_value=target),
             patch("qa_toolkit.text_tools.build_corpus", return_value=("digest", generated)),
+            patch(
+                "qa_toolkit.text_tools.load_consumer",
+                return_value=SimpleNamespace(
+                    text=SimpleNamespace(prose=SimpleNamespace(include=()))
+                ),
+            ),
             patch("qa_toolkit.text_tools._source_paths", return_value=("README.md",)),
             patch("qa_toolkit.text_tools.select_tools", return_value=(object(),)),
             patch("qa_toolkit.text_tools.executable_path", return_value=Path("/tool")),

@@ -1,13 +1,10 @@
 # qa-toolkit
 
-Personal, repository-scoped quality tooling for Python, Julia, documentation, Git, and Codex.
+Repository-scoped quality tooling for Python, Julia, documentation, Git, and Codex.
 
 This repository owns one set of pinned tool payloads, configurations, vocabulary, hooks, skills,
 workflows, and deterministic work-package utilities. A consumer opts in through a tracked
 `.qat.toml`. Enrollment creates only repository-local links and state.
-
-The toolkit is private personal tooling. It carries no compatibility, support, or suitability
-promise for third-party use.
 
 ## Install the central bundle
 
@@ -59,6 +56,18 @@ A declared vocabulary file may use schema 1 for terminology, roles, acronyms, an
 allowances. Schema 3 additionally defines callable grammars, path-specific role ownership,
 identifier replacements, and accepted and rejected examples. The runner validates that policy,
 generates the shared text inputs from it, and adds one semantic Python gate.
+
+Restrict Vale prose analysis to bounded tracked paths when a repository needs only one document
+class:
+
+```toml
+[text.prose]
+include = ["**/*.tex"]
+```
+
+Without this declaration, Vale retains its default selection of Markdown, LaTeX, Python
+docstrings, and Julia docstrings. The declaration changes Vale inputs only. Spelling has its own
+gate selection.
 
 ## Run quality gates
 

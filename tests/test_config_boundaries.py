@@ -318,6 +318,7 @@ class ConsumerBoundaryTests(unittest.TestCase):
             "\nvocabulary = []\n",
             "\nast_grep = []\n",
             "\npython = []\n",
+            "\ntext = []\n",
         )
         for addition in additions:
             with self.subTest(addition=addition), tempfile.TemporaryDirectory() as raw:
@@ -327,7 +328,7 @@ class ConsumerBoundaryTests(unittest.TestCase):
                     config.load_consumer(target)
 
     def test_consumer_rejects_non_table_sections_after_valid_toml_parsing(self) -> None:
-        sections = ("vocabulary", "ast_grep", "python", "work")
+        sections = ("vocabulary", "ast_grep", "python", "text", "work")
         for section in sections:
             with self.subTest(section=section), tempfile.TemporaryDirectory() as raw:
                 target = Path(raw)
@@ -364,6 +365,35 @@ class ConsumerBoundaryTests(unittest.TestCase):
                 target, path = self._consumer(Path(raw))
                 path.write_text(
                     path.read_text(encoding="utf-8").replace(old, new), encoding="utf-8"
+                )
+                with self.assertRaises(ConfigurationError):
+                    config.load_consumer(target)
+
+    def test_consumer_prose_includes_are_closed_and_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            target, path = self._consumer(Path(raw))
+            path.write_text(
+                path.read_text(encoding="utf-8")
+                + '\n[text.prose]\ninclude = ["**/*.tex", "papers/main.tex"]\n',
+                encoding="utf-8",
+            )
+            consumer = config.load_consumer(target)
+            self.assertEqual(consumer.text.prose.include, ("**/*.tex", "papers/main.tex"))
+
+        cases = (
+            "[text.prose]\ninclude = []\n",
+            "[text.prose]\nunknown = true\n",
+            '[text.prose]\ninclude = ["../paper.tex"]\n',
+            '[text.prose]\ninclude = ["/paper.tex"]\n',
+            "[text.prose]\ninclude = ['docs\\\\paper.tex']\n",
+            '[text.prose]\ninclude = ["**/*.tex", "**/*.tex"]\n',
+        )
+        for declaration in cases:
+            with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as raw:
+                target, path = self._consumer(Path(raw))
+                path.write_text(
+                    path.read_text(encoding="utf-8") + "\n" + declaration,
+                    encoding="utf-8",
                 )
                 with self.assertRaises(ConfigurationError):
                     config.load_consumer(target)
