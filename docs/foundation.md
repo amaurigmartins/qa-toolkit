@@ -172,6 +172,3 @@ hooks, breaker state, evidence, and work state for two repositories.
 The foundation proof passed 234 tests with one explicit Julia acceptance skip and 95.62% branch
 coverage. Both Julia runtimes, every selected fast gate, repository isolation, exact cleanup,
 advisory classification, and work-package recovery passed.
-
-Gridform must not pin a foundation branch. Its cutover begins only after this repository merges and
-provides the exact merged revision.

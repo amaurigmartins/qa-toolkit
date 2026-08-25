@@ -2,6 +2,8 @@
 
 Repository-scoped quality tooling for Python, Julia, documentation, Git, and Codex.
 
+In all honesty, this is just yet another hoard of tooling that I scavenged like a spelunking goblin.
+
 This repository owns one set of pinned tool payloads, configurations, vocabulary, hooks, skills,
 workflows, and deterministic work-package utilities. A consumer opts in through a tracked
 `.qat.toml`. Enrollment creates only repository-local links and state.
