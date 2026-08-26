@@ -1,3 +1,3 @@
 using Pkg
 
-Pkg.test(; allow_reresolve = false)
+Pkg.test(; allow_reresolve = false, test_args = ARGS)

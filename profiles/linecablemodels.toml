@@ -1,0 +1,180 @@
+schema_version = 1
+name = "linecablemodels"
+tools = [
+  "gitleaks", "cocogitto", "actionlint", "zizmor", "vale", "node", "cspell",
+  "python", "julia-1.12.6", "juliaformatter", "aqua", "gh", "rulesync",
+]
+configurations = []
+skills = [
+  "library/skills/plan-work-package",
+  "library/skills/stage-work-item",
+  "library/skills/execute-work-item",
+  "library/skills/reconcile-work-item",
+  "library/skills/run-work-package",
+  "library/skills/close-work-package",
+  "library/skills/release-work-package",
+]
+
+[[hooks]]
+kind = "git"
+event = "pre-commit"
+entry = "library/git-hooks/pre-commit/quality"
+enabled = true
+
+[[hooks]]
+kind = "git"
+event = "commit-msg"
+entry = "library/git-hooks/commit-msg/commit-message"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "SessionStart"
+entry = "library/codex-hooks/SessionStart/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PreToolUse"
+entry = "library/codex-hooks/PreToolUse/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PermissionRequest"
+entry = "library/codex-hooks/PermissionRequest/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PostToolUse"
+entry = "library/codex-hooks/PostToolUse/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "PostToolUse"
+entry = "library/codex-hooks/PostToolUse/fast-check"
+enabled = false
+
+[[hooks]]
+kind = "codex"
+event = "Stop"
+entry = "library/codex-hooks/Stop/guardrail"
+enabled = true
+
+[[hooks]]
+kind = "codex"
+event = "SessionEnd"
+entry = "library/codex-hooks/SessionEnd/guardrail"
+enabled = true
+
+[[gates]]
+id = "repository-secrets"
+phase = "check"
+argv = ["{tool:gitleaks}", "detect", "--source", ".", "--no-banner", "--no-color", "--redact"]
+triggers = ["**"]
+timeout = 180
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "workflow-syntax"
+phase = "check"
+argv = ["{tool:actionlint}", "-no-color"]
+triggers = [".github/workflows/**"]
+timeout = 180
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "workflow-security"
+phase = "check"
+argv = ["{tool:zizmor}", "--offline", "--pedantic", "--color", "never", ".github/workflows"]
+triggers = [".github/workflows/**"]
+timeout = 180
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-source"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_source", "--target", "."]
+triggers = ["**/*.jl"]
+timeout = 120
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-format"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "format", "--runtime", "1.12.6", "--target", "."]
+triggers = ["**/*.jl", "**/.JuliaFormatter.toml"]
+timeout = 300
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "text-spelling"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "cspell", "--target", "."]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.jl", "**/*.toml", "**/*.json", "**/*.yml", "**/*.yaml"]
+timeout = 300
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "text-prose"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "vale", "--target", "."]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.jl"]
+timeout = 300
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "text-ai-tells"
+phase = "check"
+argv = ["{qat-python}", "-m", "qa_toolkit.text_tools", "vale", "--target", ".", "--advisory"]
+triggers = ["**/*.md", "**/*.markdown", "**/*.tex", "**/*.jl"]
+timeout = 300
+severity = "advisory"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-tests"
+phase = "sentinel"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "tests", "--runtime", "1.12.6", "--target", "."]
+triggers = ["**/*.jl", "**/Project.toml", "**/Manifest.toml"]
+timeout = 1200
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]
+
+[[gates]]
+id = "julia-quality-tests"
+phase = "sentinel"
+argv = ["{qat-python}", "-m", "qa_toolkit.julia_tools", "tests", "--runtime", "1.12.6", "--test-arg", "tag:quality", "--target", "."]
+triggers = ["**/*.jl", "**/Project.toml", "**/Manifest.toml"]
+timeout = 1200
+severity = "blocking"
+variants = []
+finding_exit_codes = [1]
+execution_error_exit_codes = [2]

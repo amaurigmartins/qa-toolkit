@@ -14,6 +14,7 @@ from pathlib import Path, PurePosixPath
 from unittest.mock import patch
 
 from qa_toolkit import julia_source, julia_tools
+from qa_toolkit.config import load_profile
 from qa_toolkit.deployment import enroll
 from qa_toolkit.julia_source import findings
 from qa_toolkit.julia_tools import (
@@ -153,7 +154,7 @@ end
                     self.assertEqual(result["julia_runtime"], expected_runtime)
                 self.assertEqual(before, {path: (target / path).read_bytes() for path in before})
 
-    def test_nested_projects_are_discovered_and_missing_manifests_fail_closed(self) -> None:
+    def test_nested_projects_and_manifestless_packages_run_from_private_resolution(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             target = _target("1.12.6", Path(raw))
             copied = tuple(
@@ -174,11 +175,66 @@ end
             (target / "Manifest.toml").unlink()
             _git(target, "add", "Manifest.toml")
             _git(target, "commit", "-m", "test(julia): remove root manifest")
-            with self.assertRaisesRegex(JuliaToolError, "missing manifest"):
-                _run_native("tests", "1.12.6", target, toolkit_root())
+            before = subprocess.run(
+                ["git", "-C", str(target), "status", "--porcelain=v1", "-z"],
+                check=True,
+                capture_output=True,
+                timeout=30,
+                shell=False,
+            ).stdout
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(
+                    _run_native(
+                        "tests",
+                        "1.12.6",
+                        target,
+                        toolkit_root(),
+                        ("tag:quality",),
+                    ),
+                    0,
+                )
+            self.assertIn("julia-resolved-manifest: . sha256=", output.getvalue())
+            self.assertFalse((target / "Manifest.toml").exists())
+            after = subprocess.run(
+                ["git", "-C", str(target), "status", "--porcelain=v1", "-z"],
+                check=True,
+                capture_output=True,
+                timeout=30,
+                shell=False,
+            ).stdout
+            self.assertEqual(before, after)
 
 
 class JuliaToolBoundaryTests(unittest.TestCase):
+    def test_linecablemodels_profile_runs_repository_owned_quality_tests(self) -> None:
+        root = toolkit_root()
+        profile = load_profile("linecablemodels", root)
+        gates = {gate.identifier: gate for gate in profile.gates}
+        self.assertIn("aqua", profile.tools)
+        self.assertNotIn("julia-1.10.11", profile.tools)
+        self.assertFalse(
+            any("aqua" in argument.casefold() for gate in profile.gates for argument in gate.argv)
+        )
+        self.assertEqual(
+            gates["julia-quality-tests"].argv,
+            (
+                "{qat-python}",
+                "-m",
+                "qa_toolkit.julia_tools",
+                "tests",
+                "--runtime",
+                "1.12.6",
+                "--test-arg",
+                "tag:quality",
+                "--target",
+                ".",
+            ),
+        )
+        self.assertIn(
+            "test_args = ARGS",
+            (root / "config/julia/scripts/test_project.jl").read_text(encoding="utf-8"),
+        )
+
     def test_snapshot_refuses_gitlinks_and_irregular_sources(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             target = Path(raw) / "target"
@@ -235,7 +291,7 @@ class JuliaToolBoundaryTests(unittest.TestCase):
             with self.subTest(message=message), self.assertRaisesRegex(JuliaToolError, message):
                 _package_identity(value, "Project.toml")
 
-    def test_project_eligibility_requires_loadable_tests_and_manifests(self) -> None:
+    def test_project_eligibility_requires_loadable_tests(self) -> None:
         invalid = JuliaProject(PurePosixPath("nested"), "Nested", False, None, True)
         with self.assertRaisesRegex(JuliaToolError, "loadable package"):
             _eligible((invalid,), "tests")
@@ -244,8 +300,7 @@ class JuliaToolBoundaryTests(unittest.TestCase):
         no_tests = JuliaProject(PurePosixPath("nested"), "Nested", True, None, False)
         self.assertEqual(_eligible((no_tests,), "tests"), ())
         missing = JuliaProject(PurePosixPath("nested"), "Nested", True, None, True)
-        with self.assertRaisesRegex(JuliaToolError, "missing manifest"):
-            _eligible((missing,), "aqua")
+        self.assertEqual(_eligible((missing,), "aqua"), (missing,))
 
     def test_private_environment_argv_and_invocation_are_bounded(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -254,6 +309,14 @@ class JuliaToolBoundaryTests(unittest.TestCase):
             run.mkdir()
             environment = _environment(run, root, "1.12.6")
             self.assertTrue(environment["JULIA_DEPOT_PATH"].startswith(str(run / "depot")))
+            target = Path(raw) / "target"
+            target.mkdir()
+            cached = _environment(run, root, "1.12.6", target)
+            self.assertTrue(
+                cached["JULIA_DEPOT_PATH"].startswith(
+                    str(target / ".git/qat/cache/julia/1.12.6/depot")
+                )
+            )
             argv = _julia_argv(Path("julia"), Path("project"), Path("script.jl"), "argument")
             self.assertIn("--startup-file=no", argv)
             completed = subprocess.CompletedProcess((), 1, f"{run}/source\n", f"{run}/error")
@@ -340,6 +403,32 @@ class JuliaToolBoundaryTests(unittest.TestCase):
             ):
                 self.assertEqual(_run_native("explicit-imports", "1.12.6", target, root), 1)
 
+            with (
+                patch(
+                    "qa_toolkit.julia_tools._tracked_snapshot",
+                    return_value=(".JuliaFormatter.toml",),
+                ),
+                patch("qa_toolkit.julia_tools.discover_projects", return_value=(project,)),
+                patch(
+                    "qa_toolkit.julia_tools._dependency_identity",
+                    return_value=("same", "same"),
+                ),
+                patch("qa_toolkit.julia_tools._invoke", side_effect=(0, 0)) as invoke,
+            ):
+                self.assertEqual(
+                    _run_native(
+                        "tests",
+                        "1.12.6",
+                        target,
+                        root,
+                        ("tag:quality",),
+                    ),
+                    0,
+                )
+            self.assertIn("tag:quality", invoke.call_args_list[1].args[0])
+            with self.assertRaisesRegex(JuliaToolError, "valid only for the tests operation"):
+                _run_native("aqua", "1.12.6", target, root, ("tag:quality",))
+
     def test_missing_runtime_trivy_empty_scan_and_command_main(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw) / "root"
@@ -393,6 +482,14 @@ class JuliaToolBoundaryTests(unittest.TestCase):
         ):
             julia_tools.main(["tests"])
         self.assertEqual(exited.exception.code, 2)
+        with (
+            patch("qa_toolkit.julia_tools.resolve_target", return_value=Path("/target")),
+            patch("qa_toolkit.julia_tools._run_native", return_value=0) as run,
+            self.assertRaises(SystemExit) as exited,
+        ):
+            julia_tools.main(["tests", "--runtime", "1.12.6", "--test-arg", "tag:quality"])
+        self.assertEqual(exited.exception.code, 0)
+        self.assertEqual(run.call_args.args[-1], ("tag:quality",))
 
     def test_julia_source_main_reports_findings_and_errors(self) -> None:
         target = Path("/target")

@@ -112,8 +112,6 @@ def _eligible(projects: tuple[JuliaProject, ...], operation: str) -> tuple[Julia
             raise JuliaToolError(f"Julia tests require a loadable package: {label}")
         if not project.loadable or (operation == "tests" and not project.has_tests):
             continue
-        if project.manifest is None:
-            raise JuliaToolError(f"Julia gate refuses to resolve a missing manifest: {label}")
         selected.append(project)
     return tuple(selected)
 
@@ -122,17 +120,24 @@ def _digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _dependency_identity(root: Path) -> tuple[str, str]:
-    return _digest(root / "Project.toml"), _digest(root / "Manifest.toml")
+def _dependency_identity(root: Path) -> tuple[str, str | None]:
+    manifest = root / "Manifest.toml"
+    return _digest(root / "Project.toml"), _digest(manifest) if manifest.is_file() else None
 
 
-def _environment(run_root: Path, root: Path, runtime: str) -> dict[str, str]:
+def _environment(
+    run_root: Path, root: Path, runtime: str, target: Path | None = None
+) -> dict[str, str]:
     minor = ".".join(runtime.split(".")[:2])
-    writable_depot = run_root / "depot"
+    writable_depot = (
+        target / ".git" / "qat" / "cache" / "julia" / runtime / "depot"
+        if target is not None
+        else run_root / "depot"
+    )
     home = run_root / "home"
     cache = run_root / "cache"
     for directory in (writable_depot, home, cache):
-        directory.mkdir(mode=0o700)
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     central_depot = payload_root(root) / "julia" / "qa" / minor / "depot"
     environment = os.environ.copy()
     environment.update(
@@ -184,7 +189,15 @@ def _julia_argv(
     )
 
 
-def _run_native(operation: str, runtime: str, target: Path, root: Path) -> int:
+def _run_native(
+    operation: str,
+    runtime: str,
+    target: Path,
+    root: Path,
+    test_arguments: tuple[str, ...] = (),
+) -> int:
+    if test_arguments and operation != "tests":
+        raise JuliaToolError("--test-arg is valid only for the tests operation")
     executable = payload_root(root) / "julia" / runtime / "bin" / "julia"
     if not executable.is_file():
         raise JuliaToolError(f"missing accepted Julia runtime: {runtime}")
@@ -202,7 +215,7 @@ def _run_native(operation: str, runtime: str, target: Path, root: Path) -> int:
                 root / "config/julia/.JuliaFormatter.toml", snapshot / ".JuliaFormatter.toml"
             )
         projects = discover_projects(snapshot, copied)
-        environment = _environment(run_root, root, runtime)
+        environment = _environment(run_root, root, runtime, target)
         if operation == "format":
             code = _invoke(
                 _julia_argv(
@@ -234,13 +247,25 @@ def _run_native(operation: str, runtime: str, target: Path, root: Path) -> int:
             )
             if instantiate != 0:
                 return 2
+            resolved = _dependency_identity(project_root)
+            if resolved[0] != before[0] or (project.manifest is not None and resolved != before):
+                raise JuliaToolError(
+                    f"Julia command modified copied dependency files: {project_root}"
+                )
+            if project.manifest is None:
+                if resolved[1] is None:
+                    raise JuliaToolError(f"Julia did not resolve a manifest for: {project_root}")
+                label = project.directory.as_posix() or "."
+                print(f"julia-resolved-manifest: {label} sha256={resolved[1]}")
             script = {
                 "tests": "test_project.jl",
                 "aqua": "aqua_check.jl",
                 "explicit-imports": "explicit_imports_check.jl",
             }[operation]
             active_project = project_root if operation == "tests" else qa_project
-            arguments = () if operation == "tests" else (project_root,)
+            arguments: tuple[str | Path, ...] = (
+                test_arguments if operation == "tests" else (project_root,)
+            )
             code = _invoke(
                 _julia_argv(executable, active_project, scripts / script, *arguments),
                 project_root,
@@ -248,7 +273,7 @@ def _run_native(operation: str, runtime: str, target: Path, root: Path) -> int:
                 run_root,
                 1200,
             )
-            if _dependency_identity(project_root) != before:
+            if _dependency_identity(project_root) != resolved:
                 raise JuliaToolError(
                     f"Julia command modified copied dependency files: {project_root}"
                 )
@@ -317,6 +342,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="qat-julia")
     parser.add_argument("operation", choices=OPERATIONS)
     parser.add_argument("--runtime", choices=RUNTIMES)
+    parser.add_argument("--test-arg", action="append", default=[])
     parser.add_argument("--target", type=Path, default=Path.cwd())
     options = parser.parse_args(arguments)
     try:
@@ -326,7 +352,13 @@ def main(arguments: Sequence[str] | None = None) -> None:
         else:
             if options.runtime is None:
                 raise JuliaToolError("native Julia operations require --runtime")
-            code = _run_native(options.operation, options.runtime, target, toolkit_root())
+            code = _run_native(
+                options.operation,
+                options.runtime,
+                target,
+                toolkit_root(),
+                tuple(options.test_arg),
+            )
     except (
         JuliaToolError,
         DeploymentError,

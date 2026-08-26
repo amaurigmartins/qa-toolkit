@@ -6,6 +6,7 @@ import contextlib
 import importlib.metadata
 import io
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -33,6 +34,8 @@ from qa_toolkit.hook_deployment import HookDeploymentError
 from qa_toolkit.registry import RegistryError
 from qa_toolkit.work import WorkError
 
+ROOT = Path(__file__).parents[1]
+
 
 class _Record:
     def __init__(self, value: object) -> None:
@@ -55,6 +58,22 @@ def _output(callable_: object, arguments: list[str]) -> tuple[str, str, int | No
 
 
 class DispatchTests(unittest.TestCase):
+    def test_tracked_launcher_resolves_an_external_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            launcher = Path(raw) / "qat"
+            launcher.symlink_to(ROOT / "bin/qat")
+            completed = subprocess.run(
+                [str(launcher), "tool", "list"],
+                cwd="/",
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                shell=False,
+            )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("uv\t", completed.stdout)
+
     def test_grouped_and_direct_commands_are_translated(self) -> None:
         self.assertEqual(
             dispatch._command_name(["check", "--target", "."]), ("qat-check", ["--target", "."])
@@ -90,7 +109,16 @@ class DispatchTests(unittest.TestCase):
         ):
             dispatch.main()
         self.assertEqual(raised.exception.code, 2)
-        self.assertIn("usage", stderr.getvalue())
+        rendered = stderr.getvalue()
+        self.assertIn("usage", rendered)
+        self.assertIn("Quality gates:", rendered)
+        self.assertIn("repo enroll | sync | status | unenroll", rendered)
+        self.assertIn("work report | retire | release | template", rendered)
+
+        stdout = io.StringIO()
+        with patch.object(sys, "argv", ["qat", "--help"]), contextlib.redirect_stdout(stdout):
+            dispatch.main()
+        self.assertIn("Central tools:", stdout.getvalue())
 
 
 class RunCliTests(unittest.TestCase):

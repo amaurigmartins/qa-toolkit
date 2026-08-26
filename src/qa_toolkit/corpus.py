@@ -360,18 +360,51 @@ def _pattern(term: str) -> str:
     return rf"\b{separator.join(re.escape(part) for part in parts)}\b"
 
 
-def _vale_rule(level: str, terms: set[str]) -> str:
+def _vale_rule_name(identifier: str) -> str:
+    return "".join(part.capitalize() for part in identifier.split("-") if part)
+
+
+def _vale_existence_rule(
+    level: str,
+    terms: set[str],
+    guidance: str,
+    suggestions: tuple[str, ...] = (),
+) -> str:
     patterns = sorted({_pattern(term) for term in terms}) or ["a^"]
+    message = f"{guidance.rstrip()} Found '%s'."
     lines = [
         "extends: existence",
-        "message: \"Replace vague terminology '%s' with the exact operation, "
-        'object, or property."',
+        f"message: {json.dumps(message)}",
         f"level: {level}",
         "ignorecase: true",
         "tokens:",
         *(f"  - {json.dumps(pattern)}" for pattern in patterns),
     ]
+    if suggestions:
+        lines.extend(
+            (
+                "action:",
+                "  name: replace",
+                "  params:",
+                *(f"    - {json.dumps(suggestion)}" for suggestion in suggestions),
+            )
+        )
     return "\n".join(lines) + "\n"
+
+
+def _vale_substitution_rule(level: str, term: str, replacement: str, guidance: str) -> str:
+    message = f"{guidance.rstrip()} Use '%s' instead of '%s'."
+    return "\n".join(
+        (
+            "extends: substitution",
+            f"message: {json.dumps(message)}",
+            f"level: {level}",
+            "ignorecase: true",
+            "swap:",
+            f"  {json.dumps(_pattern(term))}: {json.dumps(replacement)}",
+            "",
+        )
+    )
 
 
 def _symlink(source: Path, destination: Path) -> None:
@@ -381,11 +414,13 @@ def _symlink(source: Path, destination: Path) -> None:
 
 def _resolved(corpus: Corpus, consumer: ConsumerVocabulary) -> dict[str, object]:
     shared: dict[str, tuple[str, str]] = {}
+    shared_rule_by_form: dict[str, TermRule] = {}
     for rule in corpus.terms:
         if rule.prose == "off":
             continue
         for form in rule.forms:
             shared[_normalized(form)] = (form, rule.prose)
+            shared_rule_by_form[_normalized(form)] = rule
     literal_allowances = {_normalized(term) for term in consumer.literal_allowances}
     forbidden_acceptance = sorted(
         term
@@ -417,6 +452,70 @@ def _resolved(corpus: Corpus, consumer: ConsumerVocabulary) -> dict[str, object]
         if _normalized(form) not in promoted
     }
     repository_errors = set(consumer_rejected)
+    replacement_forms = {_normalized(term) for term in consumer.replacements}
+    shared_prose_rules: list[dict[str, object]] = []
+    repository_prose_rules: list[dict[str, object]] = []
+    for rule in corpus.terms:
+        if rule.prose == "off":
+            continue
+        shared_forms = tuple(
+            form
+            for form in rule.forms
+            if rule.prose != "warning" or _normalized(form) not in promoted
+        )
+        if shared_forms:
+            shared_prose_rules.append(
+                {
+                    "id": rule.identifier,
+                    "forms": list(shared_forms),
+                    "severity": rule.prose,
+                    "guidance": rule.guidance,
+                    "suggestions": list(rule.suggestions),
+                }
+            )
+        promoted_forms = tuple(
+            form
+            for form in rule.forms
+            if rule.prose == "warning"
+            and _normalized(form) in promoted
+            and _normalized(form) not in replacement_forms
+        )
+        if promoted_forms:
+            repository_prose_rules.append(
+                {
+                    "id": f"promoted-{rule.identifier}",
+                    "forms": list(promoted_forms),
+                    "severity": "error",
+                    "guidance": rule.guidance,
+                    "suggestions": list(rule.suggestions),
+                }
+            )
+    shared_warning_forms = {
+        form for form, (_literal, severity) in shared.items() if severity == "warning"
+    }
+    repository_rejected = sorted(
+        term
+        for term in consumer.rejected
+        if _normalized(term) not in shared_warning_forms
+        and _normalized(term) not in replacement_forms
+    )
+    repository_replacements = []
+    for term, replacement in sorted(
+        consumer.replacements.items(), key=lambda item: item[0].casefold()
+    ):
+        shared_rule = shared_rule_by_form.get(_normalized(term))
+        repository_replacements.append(
+            {
+                "id": f"replace-{_normalized(term).replace('_', '-')}",
+                "term": term,
+                "replacement": replacement,
+                "guidance": (
+                    shared_rule.guidance
+                    if shared_rule is not None
+                    else "Use the configured repository terminology."
+                ),
+            }
+        )
     accepted = (
         set(corpus.accepted)
         | set(corpus.acronyms)
@@ -441,6 +540,10 @@ def _resolved(corpus: Corpus, consumer: ConsumerVocabulary) -> dict[str, object]
         "repository_errors": sorted(repository_errors),
         "accepted": sorted(accepted, key=str.casefold),
         "replacements": consumer.replacements,
+        "shared_prose_rules": shared_prose_rules,
+        "repository_prose_rules": repository_prose_rules,
+        "repository_rejected": repository_rejected,
+        "repository_replacements": repository_replacements,
         "hedges": list(corpus.hedges),
         "fillers": list(corpus.fillers),
         "roles": roles,
@@ -494,17 +597,63 @@ def _write_outputs(stage: Path, root: Path, resolved: dict[str, object]) -> str:
     )
     (stage / "vale/.vale.ini").write_text(vale_configuration, encoding="utf-8")
     shutil.copy2(root / "config/vale/ai-tells.ini", stage / "vale/ai-tells.ini")
-    (stage / "vale/styles/OwnedTerms/Forbidden.yml").write_text(
-        _vale_rule("error", set(cast(list[str], resolved["shared_errors"]))), encoding="utf-8"
-    )
-    (stage / "vale/styles/OwnedTerms/Questionable.yml").write_text(
-        _vale_rule("warning", set(cast(list[str], resolved["shared_warnings"]))),
+    for rule in cast(list[dict[str, object]], resolved.get("shared_prose_rules", [])):
+        identifier = cast(str, rule["id"])
+        (stage / f"vale/styles/OwnedTerms/{_vale_rule_name(identifier)}.yml").write_text(
+            _vale_existence_rule(
+                cast(str, rule["severity"]),
+                set(cast(list[str], rule["forms"])),
+                cast(str, rule["guidance"]),
+                tuple(cast(list[str], rule["suggestions"])),
+            ),
+            encoding="utf-8",
+        )
+    (stage / "vale/styles/OwnedTerms/Hedges.yml").write_text(
+        _vale_existence_rule(
+            "warning",
+            set(cast(list[str], resolved.get("hedges", []))),
+            "Replace the hedge with a measured condition or uncertainty.",
+        ),
         encoding="utf-8",
     )
+    (stage / "vale/styles/OwnedTerms/Fillers.yml").write_text(
+        _vale_existence_rule(
+            "error",
+            set(cast(list[str], resolved.get("fillers", []))),
+            "Delete the filler or state the technical fact directly.",
+        ),
+        encoding="utf-8",
+    )
+    for rule in cast(list[dict[str, object]], resolved.get("repository_prose_rules", [])):
+        identifier = cast(str, rule["id"])
+        (stage / f"vale/styles/RepositoryTerms/{_vale_rule_name(identifier)}.yml").write_text(
+            _vale_existence_rule(
+                cast(str, rule["severity"]),
+                set(cast(list[str], rule["forms"])),
+                cast(str, rule["guidance"]),
+                tuple(cast(list[str], rule["suggestions"])),
+            ),
+            encoding="utf-8",
+        )
     (stage / "vale/styles/RepositoryTerms/Forbidden.yml").write_text(
-        _vale_rule("error", set(cast(list[str], resolved["repository_errors"]))),
+        _vale_existence_rule(
+            "error",
+            set(cast(list[str], resolved.get("repository_rejected", []))),
+            "Replace the repository term with precise wording.",
+        ),
         encoding="utf-8",
     )
+    for rule in cast(list[dict[str, object]], resolved.get("repository_replacements", [])):
+        identifier = cast(str, rule["id"])
+        (stage / f"vale/styles/RepositoryTerms/{_vale_rule_name(identifier)}.yml").write_text(
+            _vale_substitution_rule(
+                "error",
+                cast(str, rule["term"]),
+                cast(str, rule["replacement"]),
+                cast(str, rule["guidance"]),
+            ),
+            encoding="utf-8",
+        )
     cspell = {
         "version": "0.2",
         "language": str(resolved["locale"]),

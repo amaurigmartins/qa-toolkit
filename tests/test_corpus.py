@@ -99,6 +99,41 @@ class CorpusTests(unittest.TestCase):
             self.assertIn("form_entry", resolved["roles"]["concept"])
             self.assertIn("form", resolved["accepted"])
             self.assertIn("entry", resolved["accepted"])
+            canonical_rule = (destination / "vale/styles/OwnedTerms/Canonical.yml").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("Name the operation", canonical_rule)
+            self.assertIn("action:\n  name: replace\n  params:", canonical_rule)
+            for suggestion in (
+                "normalize",
+                "sort",
+                "deduplicate",
+                "validate",
+                "primary",
+                "stored",
+            ):
+                self.assertIn(f'    - "{suggestion}"', canonical_rule)
+            self.assertIn('"\\\\bcanonicalization\\\\b"', canonical_rule)
+            promoted_rule = (
+                destination / "vale/styles/RepositoryTerms/PromotedUnmeasuredProperties.yml"
+            ).read_text(encoding="utf-8")
+            self.assertIn("State the measurable property", promoted_rule)
+            self.assertIn("level: error", promoted_rule)
+            replacement_rule = (
+                destination / "vale/styles/RepositoryTerms/ReplaceUtilize.yml"
+            ).read_text(encoding="utf-8")
+            self.assertIn("extends: substitution", replacement_rule)
+            self.assertIn('"use"', replacement_rule)
+            self.assertIn("Use the configured repository terminology", replacement_rule)
+            hedges = (destination / "vale/styles/OwnedTerms/Hedges.yml").read_text(encoding="utf-8")
+            fillers = (destination / "vale/styles/OwnedTerms/Fillers.yml").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn('"\\\\bperhaps\\\\b"', hedges)
+            self.assertIn(
+                '"\\\\bit[\\\\s_-]+is[\\\\s_-]+worth[\\\\s_-]+noting\\\\b"',
+                fillers,
+            )
             self.assertTrue((destination / "vale/styles/ai-tells").is_symlink())
             self.assertTrue((destination / "vale/styles/ai-tells").resolve().is_dir())
             self.assertTrue(

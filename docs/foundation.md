@@ -57,6 +57,14 @@ Unknown fields, unsafe paths, weaker Python settings, copied central rules, and 
 a centrally owned tool fail validation. Import Linter runs only when the selected Python project
 contains tracked non-empty direction rules.
 
+Julia package tests remain consumer-owned. A repository keeps its Julia test dependencies,
+`Project.toml` targets, test runner, selectors, and portable CI. The toolkit supplies the runtime,
+repository-local dependency cache, disposable tracked-source copy, ordered invocation, and
+evidence. The Julia runner forwards declared test arguments to `Pkg.test`. It resolves an absent
+package manifest only inside the disposable copy and records that manifest's digest. A profile
+must not schedule an independent managed analyser when the repository already exposes that
+analyser through its native test runner.
+
 Vocabulary schema 1 covers terminology, roles, acronyms, and bounded allowances. Vocabulary schema
 3 adds callable grammars, path-specific role ownership, identifier replacement, and required
 accepted and rejected examples. One central semantic gate evaluates the schema-3 policy. The

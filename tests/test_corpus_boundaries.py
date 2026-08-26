@@ -98,6 +98,13 @@ class CorpusPrimitiveTests(unittest.TestCase):
         self.assertIsInstance(shared_warnings, list)
         assert isinstance(shared_warnings, list)
         self.assertNotIn("weak", shared_warnings)
+        shared_rules = resolved["shared_prose_rules"]
+        repository_rules = resolved["repository_prose_rules"]
+        assert isinstance(shared_rules, list)
+        assert isinstance(repository_rules, list)
+        self.assertEqual(shared_rules[0]["id"], "blocked")
+        self.assertEqual(repository_rules[0]["id"], "promoted-weak")
+        self.assertEqual(repository_rules[0]["guidance"], "Use a precise term.")
 
 
 class ConsumerVocabularyBoundaryTests(unittest.TestCase):

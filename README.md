@@ -71,6 +71,33 @@ Without this declaration, Vale retains its default selection of Markdown, LaTeX,
 docstrings, and Julia docstrings. The declaration changes Vale inputs only. Spelling has its own
 gate selection.
 
+The `linecablemodels` profile uses Julia 1.12.6 and invokes the repository's default and
+`tag:quality` test selections. Its consumer declaration should bind the native Julia inputs:
+
+```toml
+schema_version = 1
+profile = "linecablemodels"
+native_configurations = [
+  "Project.toml",
+  ".JuliaFormatter.toml",
+  "test/runtests.jl",
+  "test/quality/aqua.jl",
+]
+protected_paths = ["src", "ext", "test", "docs"]
+
+[vocabulary]
+additions = []
+allowances = []
+
+[work]
+state_directory = ".git/qat/work"
+require_allowed_paths = true
+```
+
+The Aqua dependency, tagged test, and portable Julia CI remain in LineCableModels. The toolkit
+supplies the accepted runtime and invokes that repository-owned test. It does not run a second
+Aqua rule.
+
 ## Run quality gates
 
 ```console
