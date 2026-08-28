@@ -115,6 +115,22 @@ Exit status `0` means no blocking findings, `1` means at least one blocking find
 the configuration or execution failed. Every run retains its complete output below the consumer's
 `.git/qat/evidence/` directory.
 
+## Render Mermaid PDFs
+
+The optional documentation utility renders every `.mmd` file below an explicitly selected source
+directory with the Mermaid CLI 11.16.1 container image pinned by digest. It preserves relative
+paths and skips outputs whose source content and renderer identity are unchanged.
+
+```console
+qat docs mermaid --source /path/to/repository/diagrams
+qat docs mermaid --source diagrams --target rendered --engine podman
+```
+
+When `--target` is omitted, output goes to `SOURCE/mermaid-pdf`. Podman is preferred when both
+Podman and Docker are available. `--force` renders every source again. This command is not selected
+by a profile, bootstrap, enrollment, `check`, or `sentinel`. On first use, the selected container
+engine may retrieve the pinned image into its own image storage.
+
 ## Sync, toggle, and remove
 
 ```console
@@ -144,6 +160,7 @@ dispatches to those utilities.
 | Hooks | `hook enable`, `hook disable`, `hook status`, `hook dispatch` |
 | Gates | `check`, `sentinel`, `advisory`, `commits` |
 | Text | `corpus build` |
+| Documentation | `docs mermaid` |
 | Evidence | `evidence show`, `evidence export` |
 | Work packages | `work init`, `stage`, `bind`, `reconcile`, `finish`, `report`, `retire`, `release` |
 | Agent helpers | `agent github`, `agent thread-name` |

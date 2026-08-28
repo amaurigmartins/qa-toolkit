@@ -23,6 +23,7 @@ Hooks:
 
 Text and evidence:
   corpus build
+  docs mermaid
   evidence show | export
 
 Work packages:

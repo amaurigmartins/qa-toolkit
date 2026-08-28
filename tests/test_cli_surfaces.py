@@ -112,6 +112,7 @@ class DispatchTests(unittest.TestCase):
         rendered = stderr.getvalue()
         self.assertIn("usage", rendered)
         self.assertIn("Quality gates:", rendered)
+        self.assertIn("docs mermaid", rendered)
         self.assertIn("repo enroll | sync | status | unenroll", rendered)
         self.assertIn("work report | retire | release | template", rendered)
 

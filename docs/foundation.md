@@ -41,6 +41,12 @@ their tracked locks and bootstrap recipes. Change those inputs and rebuild the a
 The toolkit keeps one active accepted installation. It has no global download cache and no stored
 rollback generations.
 
+`qat docs mermaid --source PATH` is an optional containerized document utility, not a profile tool
+or enrollment dependency. Its tracked configuration pins the Mermaid CLI image version and digest. The
+selected Podman or Docker installation owns its image storage and may retrieve that image on first
+use. Rendered PDFs and content stamps are written only below the explicit target, which defaults to
+`SOURCE/mermaid-pdf`.
+
 ## Profiles and native configuration
 
 A profile is complete and cannot inherit another profile. It names every selected tool, managed
@@ -171,8 +177,10 @@ The final foundation diff was checked for these failure modes:
 - Unmanaged hook replacement and unenrollment outside recorded ownership.
 - Cross-repository state when two consumers run concurrently.
 
-The only implicit optional global write is the documented `--link-launcher` symlink. Backup,
-evidence export, and report commands write elsewhere only when the user names a destination.
+The only implicit optional global writes are the documented `--link-launcher` symlink and the
+container-engine image retrieval requested by `qat docs mermaid`. Backup, evidence export, report,
+and Mermaid commands write output elsewhere only when the user names a destination or accepts the
+documented source-relative default.
 Consumer Python and Julia dependency files are product inputs. The toolkit uses central QA
 environments and disposable Julia copies. The acceptance fixtures verify independent enrollment,
 hooks, breaker state, evidence, and work state for two repositories.
