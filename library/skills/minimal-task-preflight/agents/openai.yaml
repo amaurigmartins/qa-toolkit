@@ -1,0 +1,6 @@
+interface:
+  display_name: "Minimal Task Preflight"
+  short_description: "Check task scope and design on demand"
+  default_prompt: "Use $minimal-task-preflight to inspect this task and identify the smallest complete implementation."
+policy:
+  allow_implicit_invocation: false

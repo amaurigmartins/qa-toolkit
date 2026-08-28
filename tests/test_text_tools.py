@@ -133,18 +133,25 @@ class TextToolAcceptanceTests(unittest.TestCase):
             self.assertIn("sample.jl:1", rendered)
             self.assertNotIn("README.md:3", rendered)
 
-    def test_vale_prose_include_scans_only_matching_tracked_sources(self) -> None:
+    def test_vale_prose_selection_scans_included_nonexcluded_sources(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             target = _consumer(Path(directory))
             declaration = target / ".qat.toml"
             declaration.write_text(
                 declaration.read_text(encoding="utf-8")
-                + '\n[text.prose]\ninclude = ["**/*.tex"]\n',
+                + '\n[text.prose]\ninclude = ["**/*.tex"]\n'
+                + 'exclude = ["reference/**"]\n',
                 encoding="utf-8",
             )
             (target / "README.md").write_text("Let's unpack the business rule.\n", encoding="utf-8")
             (target / "guide.tex").write_text(
                 "\\section{Method}\nThe middleware converts the value.\n",
+                encoding="utf-8",
+            )
+            reference = target / "reference/quoted.tex"
+            reference.parent.mkdir()
+            reference.write_text(
+                "\\section{Quote}\nThe business rule selects the value.\n",
                 encoding="utf-8",
             )
             _git(target, "add", "-A")
@@ -157,6 +164,7 @@ class TextToolAcceptanceTests(unittest.TestCase):
             rendered = output.getvalue()
             self.assertEqual(code, 1)
             self.assertIn("guide.tex:2", rendered)
+            self.assertNotIn("reference/quoted.tex", rendered)
             self.assertNotIn("README.md", rendered)
 
             advisory_output = io.StringIO()

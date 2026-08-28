@@ -9,4 +9,4 @@ Load `qat work status` before editing. Treat its current task, allowed paths, va
 
 Implement only that task. Do not change package identity or edit JSON state manually. Run `qat work finish` after the implementation is ready. It runs stored argv commands, retains full local output, amends the provisional commit, and exact-lease publishes the result.
 
-If validation fails, leave the provisional commit and worktree changes for repair. If publication is interrupted, use `qat work reconcile`. Do not improvise a force push. Post a report with `qat work report` and `qat agent github pr-comment` only when remote reporting is authorised.
+If validation fails, leave the provisional commit and worktree changes for repair. If publication is interrupted, use `qat work reconcile`. Do not improvise a force push. Post a report with `qat work report` and `qat agent github pr-comment` only when remote reporting is authorized.

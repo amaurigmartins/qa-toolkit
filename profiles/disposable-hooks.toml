@@ -4,6 +4,7 @@ tools = ["cocogitto", "python"]
 configurations = []
 gates = []
 skills = [
+  "library/skills/minimal-task-preflight",
   "library/skills/plan-work-package",
   "library/skills/stage-work-item",
   "library/skills/execute-work-item",

@@ -59,17 +59,32 @@ allowances. Schema 3 additionally defines callable grammars, path-specific role 
 identifier replacements, and accepted and rejected examples. The runner validates that policy,
 generates the shared text inputs from it, and adds one semantic Python gate.
 
+The shared corpus defaults to US English (`en-US`). A repository may select `en-GB` explicitly in
+its vocabulary file with `[settings] locale = "en-GB"`.
+
 Restrict Vale prose analysis to bounded tracked paths when a repository needs only one document
 class:
 
 ```toml
 [text.prose]
 include = ["**/*.tex"]
+exclude = ["papers/quoted-sources/**"]
 ```
 
 Without this declaration, Vale retains its default selection of Markdown, LaTeX, Python
-docstrings, and Julia docstrings. The declaration changes Vale inputs only. Spelling has its own
-gate selection.
+docstrings, and Julia docstrings. `exclude` removes matching tracked paths after `include` or the
+default selection. Both lists use bounded repository-relative patterns. The declaration changes
+Vale inputs only. Spelling remains independently controlled through the repository vocabulary.
+
+Profiles deploy `minimal-task-preflight` for an explicit repository-task review. The skill reads
+small exact excerpts from the retained general planning prompt according to the task. It does not
+load the complete prompt or run automatically.
+
+Profiles that scan package prose also deploy the explicit-only `review-technical-prose` skill.
+Invoke `$review-technical-prose` when a manual review is wanted. It runs the advisory QAT plan,
+reads the `text-ai-tells` evidence, and loads the central writing guide only after evidence exists.
+The skill judges findings in `docs/` and package docstrings. Ordinary coding does not load the
+guide.
 
 The `linecablemodels` profile uses Julia 1.12.6 and invokes the repository's default and
 `tag:quality` test selections. Its consumer declaration should bind the native Julia inputs:
@@ -97,6 +112,12 @@ require_allowed_paths = true
 The Aqua dependency, tagged test, and portable Julia CI remain in LineCableModels. The toolkit
 supplies the accepted runtime and invokes that repository-owned test. It does not run a second
 Aqua rule.
+
+Julia profiles also deploy two explicit-only skills. `julia-structural-design` routes structural
+implementation through native-first admission before ownership and dispatch doctrine.
+`julia-convergence-review` applies those doctrines during a post-refactor audit. A deterministic
+reader emits only named heading-bounded excerpts from the untouched central sources. Neither skill
+loads a complete playbook or runs automatically.
 
 ## Run quality gates
 
@@ -166,4 +187,4 @@ dispatches to those utilities.
 | Agent helpers | `agent github`, `agent thread-name` |
 
 See [the foundation record](docs/foundation.md) for directory ownership, profile rules, update
-behaviour, work-package state, CI use, and the foundation audit.
+behavior, work-package state, CI use, and the foundation audit.

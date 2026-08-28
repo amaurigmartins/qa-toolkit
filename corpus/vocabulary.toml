@@ -235,14 +235,15 @@ identifier = "error"
 commit = "error"
 
 [settings]
-locale = "en-GB"
+locale = "en-US"
 
 [prose]
 accepted = [
   "API", "ASCII", "CLI", "Codex", "CSV", "Documenter", "DSL", "Git", "GitHub", "HTTP",
   "HTTPS", "JSON", "Julia", "LaTeX", "Linux", "Markdown", "pgTAP", "POSIX", "Python",
   "Ruff", "SQL", "SSH", "TOML", "TTY", "UUID", "Vale", "XML", "YAML", "argparse",
-  "frozenset", "shutil", "spelunking", "subparser", "subparsers", "tomllib", "weakref",
+  "frozenset", "nominalized", "shutil", "spelunking", "subparser", "subparsers", "tomllib",
+  "weakref",
 ]
 hedges = [
   "arguably", "generally", "in many cases", "it may be", "often", "perhaps", "potentially",

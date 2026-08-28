@@ -75,6 +75,7 @@ generated_patterns = ["generated-api/**"]
 class CorpusTests(unittest.TestCase):
     def test_corpus_retains_source_and_advisory_rule_inventory(self) -> None:
         corpus = load_corpus()
+        self.assertEqual(corpus.locale, "en-US")
         self.assertGreaterEqual(len(corpus.terms), 20)
         self.assertIn("GPL-3.0", corpus.sources["license_families"])
         self.assertIn("**/uv.lock", corpus.sources["generated_patterns"])

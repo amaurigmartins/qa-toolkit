@@ -6,7 +6,12 @@ tools = [
   "julia-1.12.6", "juliaformatter", "aqua", "explicitimports",
 ]
 configurations = []
-skills = []
+skills = [
+  "library/skills/julia-structural-design",
+  "library/skills/julia-convergence-review",
+  "library/skills/review-technical-prose",
+  "library/skills/minimal-task-preflight",
+]
 hooks = []
 
 

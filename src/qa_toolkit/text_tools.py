@@ -73,7 +73,7 @@ class _Alias:
 
 @dataclass(frozen=True, slots=True)
 class _Alert:
-    """One normalised Vale result at its tracked source location."""
+    """One normalized Vale result at its tracked source location."""
 
     path: str
     line: int
@@ -85,7 +85,10 @@ class _Alert:
 
 
 def _source_paths(
-    target: Path, suffixes: frozenset[str], include: tuple[str, ...] = ()
+    target: Path,
+    suffixes: frozenset[str],
+    include: tuple[str, ...] = (),
+    exclude: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
     corpus = load_corpus()
     selected: list[str] = []
@@ -94,6 +97,8 @@ def _source_paths(
         if path.suffix.casefold() not in suffixes and path.name.casefold() not in _LICENSE_NAMES:
             continue
         if include and not any(_matches(relative, pattern) for pattern in include):
+            continue
+        if any(_matches(relative, pattern) for pattern in exclude):
             continue
         try:
             source = (target / relative).read_text(encoding="utf-8")
@@ -344,7 +349,8 @@ def run_vale(target_value: Path, *, advisory: bool = False) -> int:
     """Run one generated Vale rule set with mapped tracked-source findings."""
     target = resolve_target(target_value)
     _digest, generated = build_corpus(target)
-    selected = _source_paths(target, _PROSE_SUFFIXES, load_consumer(target).text.prose.include)
+    prose = load_consumer(target).text.prose
+    selected = _source_paths(target, _PROSE_SUFFIXES, prose.include, prose.exclude)
     if not selected:
         return 0
     with tempfile.TemporaryDirectory(prefix="text-", dir=target / ".git/qat") as raw:

@@ -13,7 +13,7 @@ class ConfigurationError(RuntimeError):
 
 
 class PythonTool(StrEnum):
-    """Python analyser that supports a bounded consumer exception."""
+    """Python analyzer that supports a bounded consumer exception."""
 
     RUFF = "ruff"
 
@@ -68,7 +68,7 @@ class MypySettings:
 
 @dataclass(frozen=True, order=True)
 class PythonException:
-    """One rule, bounded path, and reason-bearing analyser exception."""
+    """One rule, bounded path, and reason-bearing analyzer exception."""
 
     tool: PythonTool
     rule: str
@@ -93,6 +93,7 @@ class ProseSettings:
     """Tracked repository paths selected for prose analysis."""
 
     include: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

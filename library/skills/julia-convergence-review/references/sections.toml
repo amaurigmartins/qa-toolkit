@@ -1,0 +1,60 @@
+schema_version = 1
+
+[chunk.cleanup-reconstruct]
+source = "../../../prompts/prompt-post-refactor-cleanup-debloat.md"
+start = "## 1. First reconstruct the repository truth"
+end = "## 4. Audit architecture by responsibility, not by line count"
+
+[chunk.cleanup-architecture]
+source = "../../../prompts/prompt-post-refactor-cleanup-debloat.md"
+start = "## 4. Audit architecture by responsibility, not by line count"
+end = "## 8. Audit defensive coding at the correct boundaries"
+
+[chunk.cleanup-boundaries]
+source = "../../../prompts/prompt-post-refactor-cleanup-debloat.md"
+start = "## 8. Audit defensive coding at the correct boundaries"
+end = "## 14. Separate cleanup from intentional product refinement"
+
+[chunk.cleanup-planning]
+source = "../../../prompts/prompt-post-refactor-cleanup-debloat.md"
+start = "## 14. Separate cleanup from intentional product refinement"
+end = "## 20. Required output"
+
+[chunk.cleanup-output]
+source = "../../../prompts/prompt-post-refactor-cleanup-debloat.md"
+start = "## 20. Required output"
+end = "## 21. Hard prohibitions"
+
+[chunk.cleanup-prohibitions]
+source = "../../../prompts/prompt-post-refactor-cleanup-debloat.md"
+start = "## 21. Hard prohibitions"
+
+[chunk.native-admission]
+source = "../../../instructions/native-first-semantic-economy-playbook.md"
+start = "## 4. Abstraction admission procedure"
+end = "## 6. Tiny-helper discipline"
+
+[chunk.native-mechanical-guardrails]
+source = "../../../instructions/native-first-semantic-economy-playbook.md"
+start = "## 13. Mechanical guardrails"
+end = "## 14. Repository-specific adoption without overfitting"
+
+[chunk.native-repository-adoption]
+source = "../../../instructions/native-first-semantic-economy-playbook.md"
+start = "## 14. Repository-specific adoption without overfitting"
+end = "## 16. Pull-request acceptance checklist"
+
+[chunk.native-acceptance]
+source = "../../../instructions/native-first-semantic-economy-playbook.md"
+start = "## 16. Pull-request acceptance checklist"
+end = "## 17. Agent implementation directive"
+
+[chunk.ownership-review]
+source = "../../../instructions/ownership_centered_recursive_module_layout_playbook.md"
+start = "## 15. Documentation and agent navigation"
+end = "## 20. Final rule set"
+
+[chunk.dispatch-review]
+source = "../../../instructions/dispatch_template_method_playbook.md"
+start = "## 15. Conformance and testing"
+end = "## 19. Suggested subsystem mappings"

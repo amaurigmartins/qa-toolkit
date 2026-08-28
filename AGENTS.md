@@ -15,4 +15,4 @@ Work-package JSON is authoritative state. Markdown plans and task descriptions a
 replacement for deterministic state transitions.
 
 Use small utilities with one primary action. Avoid hidden recovery generations, global caches, and
-framework layers that do not directly implement required behaviour.
+framework layers that do not directly implement required behavior.

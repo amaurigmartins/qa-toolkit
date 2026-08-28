@@ -1,0 +1,40 @@
+schema_version = 1
+
+[chunk.task-authority]
+source = "../../../prompts/prompt-newtask-minimal.md"
+start = "## 1. Treat the supplied task as the authority"
+end = "## 4. Classify the task before choosing safeguards"
+
+[chunk.task-classification]
+source = "../../../prompts/prompt-newtask-minimal.md"
+start = "## 4. Classify the task before choosing safeguards"
+end = "## 6. Design the smallest complete solution"
+
+[chunk.task-minimal-design]
+source = "../../../prompts/prompt-newtask-minimal.md"
+start = "## 6. Design the smallest complete solution"
+end = "## 11. Keep dependencies and invalidation narrow"
+
+[chunk.task-dependencies]
+source = "../../../prompts/prompt-newtask-minimal.md"
+start = "## 11. Keep dependencies and invalidation narrow"
+end = "## 16. Build the minimum sufficient test strategy"
+
+[chunk.task-tests]
+source = "../../../prompts/prompt-newtask-minimal.md"
+start = "## 16. Build the minimum sufficient test strategy"
+end = "## 20. Perform a simplicity review before finalizing the plan"
+
+[chunk.task-simplicity]
+source = "../../../prompts/prompt-newtask-minimal.md"
+start = "## 20. Perform a simplicity review before finalizing the plan"
+end = "## 22. Required output"
+
+[chunk.task-output]
+source = "../../../prompts/prompt-newtask-minimal.md"
+start = "## 22. Required output"
+end = "## 23. Hard prohibitions"
+
+[chunk.task-prohibitions]
+source = "../../../prompts/prompt-newtask-minimal.md"
+start = "## 23. Hard prohibitions"

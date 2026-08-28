@@ -18,3 +18,13 @@ allowances = []
 [work]
 state_directory = ".git/qat/work"
 require_allowed_paths = true
+
+[text.prose]
+exclude = [
+  "library/instructions/dispatch_template_method_playbook.md",
+  "library/instructions/native-first-semantic-economy-playbook.md",
+  "library/instructions/ownership_centered_recursive_module_layout_playbook.md",
+  "library/instructions/writing-guidelines.md",
+  "library/prompts/prompt-newtask-minimal.md",
+  "library/prompts/prompt-post-refactor-cleanup-debloat.md",
+]

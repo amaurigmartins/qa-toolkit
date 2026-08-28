@@ -191,7 +191,7 @@ class TextCommandBoundaryTests(unittest.TestCase):
             patch(
                 "qa_toolkit.text_tools.load_consumer",
                 return_value=SimpleNamespace(
-                    text=SimpleNamespace(prose=SimpleNamespace(include=()))
+                    text=SimpleNamespace(prose=SimpleNamespace(include=(), exclude=()))
                 ),
             ),
             patch("qa_toolkit.text_tools._source_paths", return_value=()),
@@ -214,7 +214,7 @@ class TextCommandBoundaryTests(unittest.TestCase):
             patch(
                 "qa_toolkit.text_tools.load_consumer",
                 return_value=SimpleNamespace(
-                    text=SimpleNamespace(prose=SimpleNamespace(include=()))
+                    text=SimpleNamespace(prose=SimpleNamespace(include=(), exclude=()))
                 ),
             ),
             patch("qa_toolkit.text_tools._source_paths", return_value=("README.md",)),

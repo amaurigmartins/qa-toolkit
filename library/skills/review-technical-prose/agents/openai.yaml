@@ -1,0 +1,6 @@
+interface:
+  display_name: "Review Technical Prose"
+  short_description: "Review QAT prose advisories on demand"
+  default_prompt: "Use $review-technical-prose to review package documentation and docstrings from the QAT advisory evidence."
+policy:
+  allow_implicit_invocation: false

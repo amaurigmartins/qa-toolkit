@@ -2,27 +2,78 @@ schema_version = 1
 
 [terminology]
 accepted = [
+  "abstractdataframe",
+  "abstracttypes",
+  "applyrules",
+  "behaviour",
+  "broadcastable",
+  "cablebuilder",
+  "cabledesign",
   "Cocogitto",
+  "cutover",
+  "dataframe",
+  "DataFrames",
+  "debloating",
+  "distributionplot",
   "docstrings",
+  "earthreturn",
+  "eltype",
   "enroll",
   "enrollment",
   "evidentiary",
+  "firstindex",
+  "frequencyplot",
+  "getfield",
+  "getindex",
+  "getproperty",
+  "Gmsh",
   "Gridform",
+  "gridspace",
+  "groupeddataframe",
+  "hasproperty",
+  "iszero",
+  "kron",
+  "kronreduce",
+  "kwargs",
+  "lastindex",
+  "lineparameters",
   "LLMs",
   "LineCableModels",
+  "Makie",
+  "matrixplot",
   "metadiscursive",
   "misclassify",
+  "modaltransform",
+  "nameof",
   "nominalizations",
+  "nontrivially",
+  "Ousterhout",
+  "overfitting",
+  "ownedobject",
+  "panelize",
+  "Parnas",
+  "plotbuilder",
   "Prek",
   "Pydoclint",
   "Pylint",
   "pyproject",
+  "repackers",
+  "rownorm",
   "runtests",
+  "setindex",
+  "showerror",
+  "stdlib",
+  "strandpacking",
   "tbhb",
   "unenroll",
   "unenrollment",
   "Unslopifier",
+  "varargs",
+  "Vlissides",
+  "warntype",
+  "weakdeps",
   "worktree",
+  "xfail",
 ]
 rejected = []
 
@@ -41,22 +92,9 @@ condition = []
 qualifier = []
 
 [[allowances]]
-term = "color"
-paths = ["config/vale/styles/STECode/README.md"]
-reason = "The policy document names the AmericanSpelling rule's literal input."
-
-[[allowances]]
 term = "catalog"
 paths = ["config/vale/styles/STECode/README.md"]
 reason = "The policy document explains the repository terminology catalog."
-
-[[allowances]]
-term = "license"
-paths = ["config/vale/styles/ai-tells/UPSTREAM.md"]
-reason = "The retained upstream notice names its MIT license verbatim."
-
-[settings]
-locale = "en-GB"
 
 [sources]
 license_names = []

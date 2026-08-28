@@ -369,21 +369,37 @@ class ConsumerBoundaryTests(unittest.TestCase):
                 with self.assertRaises(ConfigurationError):
                     config.load_consumer(target)
 
-    def test_consumer_prose_includes_are_closed_and_bounded(self) -> None:
+    def test_consumer_prose_paths_are_closed_and_bounded(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             target, path = self._consumer(Path(raw))
             path.write_text(
                 path.read_text(encoding="utf-8")
-                + '\n[text.prose]\ninclude = ["**/*.tex", "papers/main.tex"]\n',
+                + '\n[text.prose]\ninclude = ["**/*.tex", "papers/main.tex"]\n'
+                + 'exclude = ["papers/generated/**"]\n',
                 encoding="utf-8",
             )
             consumer = config.load_consumer(target)
             self.assertEqual(consumer.text.prose.include, ("**/*.tex", "papers/main.tex"))
+            self.assertEqual(consumer.text.prose.exclude, ("papers/generated/**",))
+
+        with tempfile.TemporaryDirectory() as raw:
+            target, path = self._consumer(Path(raw))
+            path.write_text(
+                path.read_text(encoding="utf-8")
+                + '\n[text.prose]\nexclude = ["docs/reference/**"]\n',
+                encoding="utf-8",
+            )
+            consumer = config.load_consumer(target)
+            self.assertEqual(consumer.text.prose.include, ())
+            self.assertEqual(consumer.text.prose.exclude, ("docs/reference/**",))
 
         cases = (
+            "[text.prose]\n",
             "[text.prose]\ninclude = []\n",
+            "[text.prose]\nexclude = []\n",
             "[text.prose]\nunknown = true\n",
             '[text.prose]\ninclude = ["../paper.tex"]\n',
+            '[text.prose]\nexclude = ["../reference"]\n',
             '[text.prose]\ninclude = ["/paper.tex"]\n',
             "[text.prose]\ninclude = ['docs\\\\paper.tex']\n",
             '[text.prose]\ninclude = ["**/*.tex", "**/*.tex"]\n',

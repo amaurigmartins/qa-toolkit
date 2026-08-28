@@ -1,0 +1,106 @@
+schema_version = 1
+
+[chunk.native-admission]
+source = "../../../instructions/native-first-semantic-economy-playbook.md"
+start = "## 4. Abstraction admission procedure"
+end = "## 6. Tiny-helper discipline"
+
+[chunk.native-helpers]
+source = "../../../instructions/native-first-semantic-economy-playbook.md"
+start = "## 6. Tiny-helper discipline"
+end = "## 8. Shim, adapter, and compatibility law"
+
+[chunk.native-compatibility]
+source = "../../../instructions/native-first-semantic-economy-playbook.md"
+start = "## 8. Shim, adapter, and compatibility law"
+end = "## 10. Composition with Dispatch-Driven Template Method"
+
+[chunk.native-template-composition]
+source = "../../../instructions/native-first-semantic-economy-playbook.md"
+start = "## 10. Composition with Dispatch-Driven Template Method"
+end = "## 12. Concrete example catalogue"
+
+[chunk.native-mechanical-guardrails]
+source = "../../../instructions/native-first-semantic-economy-playbook.md"
+start = "## 13. Mechanical guardrails"
+end = "## 14. Repository-specific adoption without overfitting"
+
+[chunk.native-repository-adoption]
+source = "../../../instructions/native-first-semantic-economy-playbook.md"
+start = "## 14. Repository-specific adoption without overfitting"
+end = "## 16. Pull-request acceptance checklist"
+
+[chunk.native-acceptance]
+source = "../../../instructions/native-first-semantic-economy-playbook.md"
+start = "## 16. Pull-request acceptance checklist"
+end = "## 17. Agent implementation directive"
+
+[chunk.ownership-laws]
+source = "../../../instructions/ownership_centered_recursive_module_layout_playbook.md"
+start = "## 1. The organizing law"
+end = "## 3. Repository-level scaffold"
+
+[chunk.ownership-scaffold]
+source = "../../../instructions/ownership_centered_recursive_module_layout_playbook.md"
+start = "## 3. Repository-level scaffold"
+end = "## 5. The module-directory grammar"
+
+[chunk.ownership-placement]
+source = "../../../instructions/ownership_centered_recursive_module_layout_playbook.md"
+start = "## 5. The module-directory grammar"
+end = "## 8. Recursive decomposition"
+
+[chunk.ownership-growth]
+source = "../../../instructions/ownership_centered_recursive_module_layout_playbook.md"
+start = "## 8. Recursive decomposition"
+end = "## 10. Template Method placement"
+
+[chunk.ownership-template-placement]
+source = "../../../instructions/ownership_centered_recursive_module_layout_playbook.md"
+start = "## 10. Template Method placement"
+end = "## 12. Shared interfaces and the root grammar"
+
+[chunk.ownership-dependencies]
+source = "../../../instructions/ownership_centered_recursive_module_layout_playbook.md"
+start = "## 12. Shared interfaces and the root grammar"
+end = "## 15. Documentation and agent navigation"
+
+[chunk.ownership-navigation-growth]
+source = "../../../instructions/ownership_centered_recursive_module_layout_playbook.md"
+start = "## 15. Documentation and agent navigation"
+end = "## 17. Forbidden repository shapes"
+
+[chunk.ownership-failure-review]
+source = "../../../instructions/ownership_centered_recursive_module_layout_playbook.md"
+start = "## 17. Forbidden repository shapes"
+end = "## 20. Final rule set"
+
+[chunk.dispatch-laws]
+source = "../../../instructions/dispatch_template_method_playbook.md"
+start = "## 1. Pattern definition"
+end = "## 4. Standard subsystem anatomy"
+
+[chunk.dispatch-design]
+source = "../../../instructions/dispatch_template_method_playbook.md"
+start = "## 4. Standard subsystem anatomy"
+end = "## 7. Definitions and declarative grammar"
+
+[chunk.dispatch-definitions-results]
+source = "../../../instructions/dispatch_template_method_playbook.md"
+start = "## 7. Definitions and declarative grammar"
+end = "## 9. Validation, DataEntry, and ErrorHandler"
+
+[chunk.dispatch-boundary-patterns]
+source = "../../../instructions/dispatch_template_method_playbook.md"
+start = "## 9. Validation, DataEntry, and ErrorHandler"
+end = "## 14. Performance rules"
+
+[chunk.dispatch-performance-testing]
+source = "../../../instructions/dispatch_template_method_playbook.md"
+start = "## 14. Performance rules"
+end = "## 17. Adoption procedure for an existing subsystem"
+
+[chunk.dispatch-adoption-review]
+source = "../../../instructions/dispatch_template_method_playbook.md"
+start = "## 17. Adoption procedure for an existing subsystem"
+end = "## 19. Suggested subsystem mappings"

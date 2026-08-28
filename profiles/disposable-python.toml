@@ -6,7 +6,10 @@ tools = [
   "pytest-cov", "pylint", "vulture", "import-linter", "pydoclint", "grain", "slop", "pip-audit",
 ]
 configurations = []
-skills = []
+skills = [
+  "library/skills/review-technical-prose",
+  "library/skills/minimal-task-preflight",
+]
 hooks = []
 
 

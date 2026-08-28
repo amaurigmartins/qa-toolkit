@@ -1,0 +1,6 @@
+interface:
+  display_name: "Julia Convergence Review"
+  short_description: "Audit Julia structure and residue on demand"
+  default_prompt: "Use $julia-convergence-review to audit this Julia repository after its refactor."
+policy:
+  allow_implicit_invocation: false

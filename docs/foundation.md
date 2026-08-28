@@ -29,13 +29,13 @@ the consumer. Each consumer has independent state.
 
 ## Tool updates
 
-`qat tool list` reads the tracked catalogue. `qat tool status` verifies each accepted version from the
+`qat tool list` reads the tracked catalog. `qat tool status` verifies each accepted version from the
 active payload. `qat tool fetch TOOL` or `qat tool fetch --all` stages and verifies missing payloads.
 
 `qat tool update TOOL VERSION URL SHA256 --archive FORMAT` updates one standalone tool. The command
 downloads into `toolkit/.staging`, verifies the checksum and version output, then replaces the
-active directory and catalogue entry together. A failed update restores the active directory and
-leaves the tracked catalogue unchanged. Shared Python, Node, and Julia environments instead use
+active directory and catalog entry together. A failed update restores the active directory and
+leaves the tracked catalog unchanged. Shared Python, Node, and Julia environments instead use
 their tracked locks and bootstrap recipes. Change those inputs and rebuild the affected environment.
 
 The toolkit keeps one active accepted installation. It has no global download cache and no stored
@@ -55,7 +55,8 @@ configuration, hook, skill, and ordered gate. The consumer file may add bounded 
 - A Python project path and stricter typed Ruff, MyPy, Pylint, or Pydoclint settings.
 - A tracked ast-grep configuration and rule-test directory.
 - A tracked vocabulary file, additions, and path-bounded allowances.
-- Bounded tracked-path selection for prose analysis, such as `**/*.tex` for LaTeX-only input.
+- Bounded tracked-path inclusion and exclusion for prose analysis, such as `**/*.tex` input with
+  quoted-source directories excluded.
 - Tracked additive argument-array gates, including an opaque live-test command.
 - Protected paths and structured work-package settings.
 
@@ -68,13 +69,17 @@ Julia package tests remain consumer-owned. A repository keeps its Julia test dep
 repository-local dependency cache, disposable tracked-source copy, ordered invocation, and
 evidence. The Julia runner forwards declared test arguments to `Pkg.test`. It resolves an absent
 package manifest only inside the disposable copy and records that manifest's digest. A profile
-must not schedule an independent managed analyser when the repository already exposes that
-analyser through its native test runner.
+must not schedule an independent managed analyzer when the repository already exposes that
+analyzer through its native test runner.
 
 Vocabulary schema 1 covers terminology, roles, acronyms, and bounded allowances. Vocabulary schema
 3 adds callable grammars, path-specific role ownership, identifier replacement, and required
 accepted and rejected examples. One central semantic gate evaluates the schema-3 policy. The
 consumer does not add a separate scanner command.
+
+The central vocabulary uses US English (`en-US`) by default. A consumer vocabulary may explicitly
+select `en-GB`. The corpus generator enables exactly one spelling direction for the resolved
+locale.
 
 Enrollment exposes every executable selected by the profile through recorded symlinks below
 `.qat/bin`. Names remain unchanged unless two selected runtimes provide the same executable. Those
@@ -154,7 +159,7 @@ long-lived token. The action verifies that its delivered ref equals the declared
 local revision marker into that snapshot, reconstructs the central payload, and performs the same
 enrolment, setup, commit validation, Sentinel, and evidence-upload sequence. Repository Actions
 access must permit the consumer to use private actions from qa-toolkit. Private-workflow access by
-itself does not authorise the consumer's `GITHUB_TOKEN` to clone another private repository.
+itself does not authorize the consumer's `GITHUB_TOKEN` to clone another private repository.
 
 ## Explicit exclusions
 

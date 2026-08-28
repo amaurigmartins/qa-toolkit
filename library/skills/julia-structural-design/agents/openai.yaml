@@ -1,0 +1,6 @@
+interface:
+  display_name: "Julia Structural Design"
+  short_description: "Apply Julia structure doctrine on demand"
+  default_prompt: "Use $julia-structural-design to assess this Julia structural change before implementation."
+policy:
+  allow_implicit_invocation: false

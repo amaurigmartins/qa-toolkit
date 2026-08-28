@@ -524,14 +524,22 @@ def load_consumer(target: Path) -> Consumer:
     prose = text.get("prose", {})
     if not isinstance(prose, dict):
         raise ConfigurationError(f"{path}.text.prose: expected a table")
-    closed_keys(prose, {"include"}, f"{path}.text.prose")
+    closed_keys(prose, {"include", "exclude"}, f"{path}.text.prose")
     prose_include: tuple[str, ...] = ()
+    prose_exclude: tuple[str, ...] = ()
     if "prose" in text:
-        if "include" not in prose:
-            raise ConfigurationError(f"{path}.text.prose.include: expected a non-empty array")
-        prose_include = _repository_patterns(prose["include"], f"{path}.text.prose.include")
-        if not prose_include:
-            raise ConfigurationError(f"{path}.text.prose.include: expected a non-empty array")
+        if not prose:
+            raise ConfigurationError(f"{path}.text.prose: expected include or exclude")
+        for key in ("include", "exclude"):
+            if key not in prose:
+                continue
+            patterns = _repository_patterns(prose[key], f"{path}.text.prose.{key}")
+            if not patterns:
+                raise ConfigurationError(f"{path}.text.prose.{key}: expected a non-empty array")
+            if key == "include":
+                prose_include = patterns
+            else:
+                prose_exclude = patterns
 
     gates = tuple(
         _gate(raw, f"{path}.gates[{index}]", consumer=True)
@@ -570,7 +578,7 @@ def load_consumer(target: Path) -> Consumer:
         work_state_directory=work_state,
         work_require_allowed_paths=require_allowed,
         source=path,
-        text=TextSettings(prose=ProseSettings(include=prose_include)),
+        text=TextSettings(prose=ProseSettings(include=prose_include, exclude=prose_exclude)),
     )
 
 
@@ -622,7 +630,7 @@ def digest_consumer(consumer: Consumer) -> str:
 
 
 def profile_summary(profile: Profile) -> str:
-    """Serialise stable profile facts for command output."""
+    """Serialize stable profile facts for command output."""
     return json.dumps(
         {
             "name": profile.name,

@@ -6,6 +6,10 @@ tools = [
 ]
 configurations = []
 skills = [
+  "library/skills/julia-structural-design",
+  "library/skills/julia-convergence-review",
+  "library/skills/review-technical-prose",
+  "library/skills/minimal-task-preflight",
   "library/skills/plan-work-package",
   "library/skills/stage-work-item",
   "library/skills/execute-work-item",
