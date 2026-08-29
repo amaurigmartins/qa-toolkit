@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import stat
 import subprocess
 import tempfile
@@ -76,6 +77,11 @@ class HookDeploymentTests(unittest.TestCase):
             record = enroll(target, ROOT)
             self.assertTrue((target / ".git/hooks/pre-commit").is_symlink())
             self.assertTrue((target / ".git/hooks/commit-msg").is_symlink())
+            self.assertEqual(
+                (target / ".git/hooks/pre-commit").readlink(),
+                Path("../qat/git-hook-dispatcher"),
+            )
+            self.assertTrue((target / ".git/qat/git-hook-dispatcher").is_file())
             self.assertTrue((target / ".codex/hooks/PreToolUse").is_symlink())
             definition = json.loads((target / ".codex/hooks.json").read_text(encoding="utf-8"))
             self.assertEqual(
@@ -174,9 +180,12 @@ class HookBehaviorTests(unittest.TestCase):
         self.assertTrue(is_lifecycle_message("Merge pull request #7 from example/topic\n"))
         message = self.target / ".git/COMMIT_EDITMSG"
         message.write_text("feat(hooks): add repository dispatcher\n", encoding="utf-8")
+        environment = os.environ.copy()
+        environment["QAT_HOOK_TEST_ACCEPT_DIRTY_TOOLKIT"] = "1"
         accepted = subprocess.run(
             [str(self.target / ".git/hooks/commit-msg"), str(message)],
             cwd=self.target,
+            env=environment,
             check=False,
             capture_output=True,
             timeout=30,
@@ -187,6 +196,7 @@ class HookBehaviorTests(unittest.TestCase):
         rejected = subprocess.run(
             [str(self.target / ".git/hooks/commit-msg"), str(message)],
             cwd=self.target,
+            env=environment,
             check=False,
             capture_output=True,
             timeout=30,
@@ -194,6 +204,64 @@ class HookBehaviorTests(unittest.TestCase):
         )
         self.assertEqual(rejected.returncode, 1)
         self.assertIn(b"QCM001", rejected.stderr)
+
+    def test_toolkit_drift_and_runtime_errors_do_not_block_commits(self) -> None:
+        message = self.target / ".git/COMMIT_EDITMSG"
+        message.write_text("update\n", encoding="utf-8")
+        revision = self.target / ".git/qat/git-hook-toolkit-revision"
+        revision.write_text(f"{'0' * 40}\n", encoding="ascii")
+
+        stale = subprocess.run(
+            [str(self.target / ".git/hooks/commit-msg"), str(message)],
+            cwd=self.target,
+            check=False,
+            capture_output=True,
+            timeout=30,
+            shell=False,
+        )
+
+        self.assertEqual(stale.returncode, 0, stale.stderr)
+        self.assertIn(b"allowing Git operation", stale.stderr)
+        dirty_root = Path(self.temporary.name) / "dirty-toolkit"
+        dirty_root.mkdir()
+        _git(dirty_root, "init", "-b", "main")
+        _git(dirty_root, "config", "user.name", "QA Toolkit")
+        _git(dirty_root, "config", "user.email", "qat@example.invalid")
+        (dirty_root / "tracked").write_text("accepted\n", encoding="utf-8")
+        _git(dirty_root, "add", "tracked")
+        _git(dirty_root, "commit", "-m", "test(repo): create dirty toolkit fixture")
+        dirty_revision = _git(dirty_root, "rev-parse", "HEAD").stdout.decode().strip()
+        (self.target / ".git/qat/git-hook-toolkit-root").write_text(
+            f"{dirty_root}\n", encoding="utf-8"
+        )
+        revision.write_text(f"{dirty_revision}\n", encoding="ascii")
+        (dirty_root / "untracked").write_text("changed\n", encoding="utf-8")
+        dirty = subprocess.run(
+            [str(self.target / ".git/hooks/commit-msg"), str(message)],
+            cwd=self.target,
+            check=False,
+            capture_output=True,
+            timeout=30,
+            shell=False,
+        )
+        self.assertEqual(dirty.returncode, 0, dirty.stderr)
+        self.assertIn(b"allowing Git operation", dirty.stderr)
+        (self.target / ".git/qat/git-hook-toolkit-root").write_text(f"{ROOT}\n", encoding="utf-8")
+        revision.write_text(f"{self.record['toolkit_revision']}\n", encoding="ascii")
+        environment = os.environ.copy()
+        environment["QAT_HOOK_TEST_ACCEPT_DIRTY_TOOLKIT"] = "1"
+        environment["QAT_PYTHON"] = "/bin/false"
+        failed_runtime = subprocess.run(
+            [str(self.target / ".git/hooks/commit-msg"), str(message)],
+            cwd=self.target,
+            env=environment,
+            check=False,
+            capture_output=True,
+            timeout=30,
+            shell=False,
+        )
+        self.assertEqual(failed_runtime.returncode, 0, failed_runtime.stderr)
+        self.assertIn(b"allowing Git operation", failed_runtime.stderr)
 
     def test_protected_mutation_opens_breaker_and_sentinel_replaces_it_with_proof(self) -> None:
         pre = parse_payload(

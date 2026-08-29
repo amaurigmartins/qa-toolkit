@@ -1,0 +1,45 @@
+#!/bin/sh
+
+allow() {
+    printf '%s\n' "qat: local hook unavailable or out of sync; allowing Git operation" >&2
+    exit 0
+}
+
+case "$0" in
+    */*) hook_directory=${0%/*} ;;
+    *) hook_directory=. ;;
+esac
+git_directory=$(CDPATH='' cd -- "$hook_directory/.." 2>/dev/null && pwd -P) || allow
+state="$git_directory/qat"
+runtime="$state/git-hook-runtime"
+root_file="$state/git-hook-toolkit-root"
+revision_file="$state/git-hook-toolkit-revision"
+
+[ -x "$runtime" ] || allow
+if [ ! -f "$root_file" ] || [ -L "$root_file" ]; then
+    allow
+fi
+if [ ! -f "$revision_file" ] || [ -L "$revision_file" ]; then
+    allow
+fi
+IFS= read -r root < "$root_file" || allow
+IFS= read -r expected_revision < "$revision_file" || allow
+if [ -z "$root" ] || [ -z "$expected_revision" ]; then
+    allow
+fi
+command -v git >/dev/null 2>&1 || allow
+actual_revision=$(git -C "$root" rev-parse HEAD 2>/dev/null) || allow
+[ "$actual_revision" = "$expected_revision" ] || allow
+target=${git_directory%/.git}
+if [ "$root" != "$target" ] && [ "${QAT_HOOK_TEST_ACCEPT_DIRTY_TOOLKIT:-0}" != 1 ]; then
+    changes=$(git -C "$root" status --porcelain=v1 --untracked-files=normal 2>/dev/null) || allow
+    [ -z "$changes" ] || allow
+fi
+
+QAT_GIT_HOOK_TRAMPOLINE=1 QAT_HOOK_INVOKED_AS="$0" "$runtime" "$@"
+status=$?
+case "$status" in
+    0) exit 0 ;;
+    10) exit 1 ;;
+    *) allow ;;
+esac

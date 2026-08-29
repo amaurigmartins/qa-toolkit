@@ -64,7 +64,10 @@ def main(arguments: Sequence[str] | None = None) -> None:
             hook_arguments = tuple(options.arguments)
             if hook_arguments[:1] == ("--",):
                 hook_arguments = hook_arguments[1:]
-            raise SystemExit(dispatch(target, kind, event, hook_arguments))
+            dispatch_code = dispatch(target, kind, event, hook_arguments)
+            if kind == "git" and dispatch_code == 1:
+                raise SystemExit(10)
+            raise SystemExit(dispatch_code)
         target = resolve_target(options.target)
         root, record = _load(target)
         if options.operation == "status":

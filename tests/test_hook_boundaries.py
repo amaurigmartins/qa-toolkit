@@ -540,6 +540,40 @@ class HookDispatchTests(unittest.TestCase):
 
 
 class HookDeploymentBoundaryTests(unittest.TestCase):
+    def test_git_runtime_snapshot_detects_changes_and_removes_itself(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            target = Path(raw) / "target"
+            target.mkdir()
+            self.assertFalse(hook_deployment._git_runtime_current(target, None))
+
+            record = hook_deployment._reconcile_git_runtime(target, ROOT, True)
+
+            self.assertIsNotNone(record)
+            self.assertTrue(hook_deployment._git_runtime_current(target, record))
+            dispatcher = target / ".git/qat/git-hook-dispatcher"
+            dispatcher.write_text("changed\n", encoding="utf-8")
+            self.assertFalse(hook_deployment._git_runtime_current(target, record))
+            restored = hook_deployment._reconcile_git_runtime(target, ROOT, True)
+            self.assertTrue(hook_deployment._git_runtime_current(target, restored))
+            self.assertIsNone(hook_deployment._reconcile_git_runtime(target, ROOT, False))
+            self.assertFalse(dispatcher.exists())
+
+    def test_git_runtime_requires_both_central_dispatchers(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            parent = Path(raw)
+            target = parent / "target"
+            root = parent / "root"
+            target.mkdir()
+            root.mkdir()
+            with self.assertRaisesRegex(HookDeploymentError, "fail-open Git dispatcher"):
+                hook_deployment._reconcile_git_runtime(target, root, True)
+            source = root / "library/git-hook-dispatcher"
+            source.parent.mkdir(parents=True)
+            source.write_text("#!/bin/sh\n", encoding="utf-8")
+            source.chmod(0o755)
+            with self.assertRaisesRegex(HookDeploymentError, "qat-hook-dispatch"):
+                hook_deployment._reconcile_git_runtime(target, root, True)
+
     def test_definition_snapshot_restore_and_missing_dispatcher(self) -> None:
         definition = json.loads(hook_deployment._definition(set(hook_deployment.CODEX_EVENTS)))
         self.assertEqual(tuple(definition["hooks"]), hook_deployment.CODEX_EVENTS)

@@ -544,7 +544,7 @@ class HookCliTests(unittest.TestCase):
                 hook_cli.main,
                 ["dispatch", "--kind", "git", "--event", "pre-commit", "--", "arg"],
             )
-        self.assertEqual(code, 1)
+        self.assertEqual(code, 10)
         self.assertEqual(run.call_args.args[-1], ("arg",))
 
         record: dict[str, object] = {"entries": []}

@@ -13,6 +13,7 @@ from typing import Any
 
 from qa_toolkit.filesystem import atomic_bytes
 from qa_toolkit.models import Hook, Profile
+from qa_toolkit.source_identity import toolkit_revision
 
 CODEX_EVENTS = (
     "SessionStart",
@@ -22,6 +23,11 @@ CODEX_EVENTS = (
     "Stop",
     "SessionEnd",
 )
+_GIT_DISPATCHER_SOURCE = Path("library/git-hook-dispatcher")
+_GIT_DISPATCHER_PATH = Path(".git/qat/git-hook-dispatcher")
+_GIT_RUNTIME_PATH = Path(".git/qat/git-hook-runtime")
+_GIT_ROOT_PATH = Path(".git/qat/git-hook-toolkit-root")
+_GIT_REVISION_PATH = Path(".git/qat/git-hook-toolkit-revision")
 
 
 class HookDeploymentError(RuntimeError):
@@ -122,15 +128,78 @@ def _expected_dispatchers(target: Path, root: Path, profile: Profile) -> list[di
     records = []
     for kind, event in sorted({(hook.kind, hook.event) for hook in profile.hooks}):
         destination = _dispatcher_path(target, kind, event)
+        source = target / _GIT_DISPATCHER_PATH if kind == "git" else dispatcher
         records.append(
             {
                 "kind": kind,
                 "event": event,
                 "path": _relative(target, destination),
-                "target": _link(dispatcher, destination),
+                "target": _link(source, destination),
             }
         )
     return records
+
+
+def _reconcile_git_runtime(target: Path, root: Path, selected: bool) -> dict[str, Any] | None:
+    paths = (
+        _GIT_DISPATCHER_PATH,
+        _GIT_RUNTIME_PATH,
+        _GIT_ROOT_PATH,
+        _GIT_REVISION_PATH,
+    )
+    if not selected:
+        for relative in paths:
+            path = target / relative
+            if path.exists() or path.is_symlink():
+                path.unlink()
+        return None
+    source = root / _GIT_DISPATCHER_SOURCE
+    runtime_source = root / "bin" / "qat-hook-dispatch"
+    if not source.is_file() or not os.access(source, os.X_OK):
+        raise HookDeploymentError("central fail-open Git dispatcher is unavailable")
+    if not runtime_source.is_file() or not os.access(runtime_source, os.X_OK):
+        raise HookDeploymentError("central qat-hook-dispatch is unavailable")
+    dispatcher = target / _GIT_DISPATCHER_PATH
+    runtime = target / _GIT_RUNTIME_PATH
+    root_path = target / _GIT_ROOT_PATH
+    revision_path = target / _GIT_REVISION_PATH
+    content = source.read_bytes()
+    root_content = f"{root}\n".encode()
+    revision_content = f"{toolkit_revision(root)}\n".encode()
+    atomic_bytes(dispatcher, content, 0o755)
+    if runtime.exists() or runtime.is_symlink():
+        runtime.unlink()
+    runtime.symlink_to(_link(runtime_source, runtime))
+    atomic_bytes(root_path, root_content)
+    atomic_bytes(revision_path, revision_content)
+    return {
+        "dispatcher_digest": hashlib.sha256(content).hexdigest(),
+        "runtime_target": os.readlink(runtime),
+        "root_digest": hashlib.sha256(root_content).hexdigest(),
+        "revision_digest": hashlib.sha256(revision_content).hexdigest(),
+    }
+
+
+def _git_runtime_current(target: Path, record: dict[str, Any] | None) -> bool:
+    if not isinstance(record, dict):
+        return False
+    dispatcher = target / _GIT_DISPATCHER_PATH
+    runtime = target / _GIT_RUNTIME_PATH
+    root_path = target / _GIT_ROOT_PATH
+    revision_path = target / _GIT_REVISION_PATH
+    return (
+        dispatcher.is_file()
+        and not dispatcher.is_symlink()
+        and _digest(dispatcher) == record.get("dispatcher_digest")
+        and runtime.is_symlink()
+        and os.readlink(runtime) == record.get("runtime_target")
+        and root_path.is_file()
+        and not root_path.is_symlink()
+        and _digest(root_path) == record.get("root_digest")
+        and revision_path.is_file()
+        and not revision_path.is_symlink()
+        and _digest(revision_path) == record.get("revision_digest")
+    )
 
 
 def _entry_record(target: Path, root: Path, hook: Hook) -> dict[str, Any]:
@@ -225,6 +294,12 @@ def reconcile_hooks(
         if path_string in adopted:
             _restore_foreign(target, adopted.pop(path_string))
 
+    git_runtime = _reconcile_git_runtime(
+        target,
+        root,
+        any(item["kind"] == "git" for item in expected_dispatchers),
+    )
+
     for item in expected_dispatchers:
         destination = target / str(item["path"])
         if destination.exists() or destination.is_symlink():
@@ -268,8 +343,9 @@ def reconcile_hooks(
             enabled.symlink_to(str(item["enabled_target"]))
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "dispatchers": expected_dispatchers,
+        "git_runtime": git_runtime,
         "definition": definition,
         "entries": entries,
         "adopted": [adopted[path] for path in sorted(adopted)],
@@ -313,10 +389,17 @@ def hook_status(target: Path, root: Path, record: dict[str, Any]) -> dict[str, A
                 "current": available_current and not malformed_enabled,
             }
         )
-    current = definition_current and all(item["current"] for item in dispatchers + entries)
+    has_git = any(item.get("kind") == "git" for item in record.get("dispatchers", []))
+    git_runtime_current = not has_git or _git_runtime_current(target, record.get("git_runtime"))
+    current = (
+        definition_current
+        and git_runtime_current
+        and all(item["current"] for item in dispatchers + entries)
+    )
     return {
         "current": current,
         "definition_current": definition_current,
+        "git_runtime_current": git_runtime_current,
         "dispatchers": dispatchers,
         "entries": entries,
     }

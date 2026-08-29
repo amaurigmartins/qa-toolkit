@@ -1,7 +1,25 @@
 #!/bin/sh
-set -eu
+set -u
+INVOKED_AS=${QAT_HOOK_INVOKED_AS:-$0}
 SELF=$(readlink -f -- "$0")
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$SELF")/.." && pwd)
 PYTHON=${QAT_PYTHON:-"$ROOT/toolkit/python/bin/python"}
 [ -x "$PYTHON" ] || PYTHON=python3
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$ROOT/src" exec "$PYTHON" -m qa_toolkit.hook_cli dispatch --invoked-as "$0" -- "$@"
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$ROOT/src" "$PYTHON" -m qa_toolkit.hook_cli dispatch --invoked-as "$INVOKED_AS" -- "$@"
+status=$?
+if [ "${QAT_GIT_HOOK_TRAMPOLINE:-0}" = 1 ]; then
+    exit "$status"
+fi
+case "$INVOKED_AS" in
+    */.git/hooks/*)
+        case "$status" in
+            0) exit 0 ;;
+            10) exit 1 ;;
+            *)
+                printf '%s\n' "qat: local hook unavailable or out of sync; allowing Git operation" >&2
+                exit 0
+                ;;
+        esac
+        ;;
+    *) exit "$status" ;;
+esac

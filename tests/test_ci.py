@@ -1,4 +1,4 @@
-"""Static checks for exact-revision reusable CI."""
+"""Static checks for repository-owned CI."""
 
 from __future__ import annotations
 
@@ -29,41 +29,23 @@ class WorkflowTests(unittest.TestCase):
             ],
         )
 
-    def test_reusable_workflow_requires_and_verifies_exact_revision(self) -> None:
-        path = ROOT / ".github/workflows/reusable-sentinel.yml"
-        content = path.read_text(encoding="utf-8")
-        self.assertIn("workflow_call:", content)
-        self.assertIn("toolkit_revision:", content)
-        self.assertIn('test "${#TOOLKIT_REVISION}" -eq 40', content)
-        self.assertIn("git -C toolkit rev-parse HEAD)", content)
-        self.assertIn("repository: amaurigmartins/qa-toolkit", content)
-        self.assertIn("github.repository == 'amaurigmartins/qa-toolkit'", content)
-        self.assertIn("ln -s ../toolkit/toolkit target/toolkit", content)
-        self.assertEqual(content.count("name: Run Sentinel once"), 1)
-        self.assertIn("target/.git/qat/evidence", content)
-        self.assertNotIn("unslopifier", content.casefold())
+    def test_self_workflow_executes_only_the_checked_out_repository(self) -> None:
+        content = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
+        self.assertNotIn("workflow_call:", content)
+        self.assertNotIn("toolkit_revision", content)
+        self.assertNotIn("repository: amaurigmartins/qa-toolkit", content)
+        self.assertNotIn("reusable-sentinel", content)
+        self.assertIn("Julia 1.10.11 / 1.12.6", content)
+        self.assertEqual(content.count("name: Run local Sentinel once"), 1)
+        self.assertIn("./bin/qat sentinel --target .", content)
+        self.assertIn("path: .git/qat/evidence", content)
         references = ACTION.findall(content)
-        self.assertEqual(len(references), 3)
+        self.assertEqual(len(references), 2)
         self.assertTrue(all(len(revision) == 40 for _action, revision in references))
 
-    def test_self_workflow_calls_only_the_local_reusable_workflow(self) -> None:
-        content = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
-        self.assertIn("uses: ./.github/workflows/reusable-sentinel.yml", content)
-        self.assertIn("github.event.pull_request.head.sha || github.sha", content)
-        self.assertIn("Julia 1.10.11 / 1.12.6", content)
-        self.assertNotIn("bin/qat sentinel", content)
-
-    def test_private_consumer_action_binds_its_exact_delivery_revision(self) -> None:
-        content = (ROOT / ".github/actions/sentinel/action.yml").read_text(encoding="utf-8")
-        self.assertIn("using: composite", content)
-        self.assertIn("ACTION_REF: ${{ github.action_ref }}", content)
-        self.assertIn('test "$ACTION_REF" = "$TOOLKIT_REVISION"', content)
-        self.assertIn(".qat-toolkit-revision", content)
-        self.assertEqual(content.count("name: Run Sentinel once"), 1)
-        self.assertIn("${{ inputs.target_path }}/.git/qat/evidence", content)
-        self.assertNotIn("actions/checkout", content)
-        references = ACTION.findall(content)
-        self.assertEqual(len(references), 1)
+    def test_qat_exposes_no_remote_consumer_ci_runtime(self) -> None:
+        self.assertFalse((ROOT / ".github/workflows/reusable-sentinel.yml").exists())
+        self.assertFalse((ROOT / ".github/actions/sentinel/action.yml").exists())
 
 
 if __name__ == "__main__":

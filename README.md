@@ -6,9 +6,6 @@ qa-toolkit keeps a pinned tool bundle in this checkout and applies a selected, c
 profile to another Git repository. A consumer opts in with one tracked `.qat.toml` file. Enrollment
 then creates only local links and state in that consumer.
 
-This is the practical guide. For the ownership rules and design record, see
-[docs/foundation.md](docs/foundation.md).
-
 ## What you get
 
 - Fast and full quality plans with stable gate order, timeouts, severities, and exit codes.
@@ -639,6 +636,13 @@ Profiles with hooks enable the Git `pre-commit` quality check, the Git `commit-m
 main Codex guardrails by default. The Codex post-mutation `fast-check` entry is available but
 disabled by default.
 
+Git hooks are convenience feedback, not an availability boundary. An enrolled Git hook blocks
+only when the last explicitly synchronized QAT revision completes and reports a policy finding.
+A changed or dirty QAT checkout, stale deployment, missing runtime, timeout, crash, or
+unclassified exit prints a warning and allows the Git operation. Run `qat repo sync TARGET`
+explicitly to accept a new toolkit revision. Direct `qat check`, `qat commits`, and `qat sentinel`
+commands retain their ordinary nonzero exit status for automation and diagnosis.
+
 Codex hook trust is always a manual `/hooks` decision. Enrollment writes the exact local
 `.codex/hooks.json`, but qa-toolkit never grants trust or escalates permissions. `protected_paths`
 adds to the automatically protected `.qat.toml`, `.qat/**`, `.git/**`, `.codex/hooks*`, and
@@ -795,39 +799,30 @@ identity must match the request.
 
 ## Continuous integration
 
-The reusable workflow retrieves the consumer and the exact qa-toolkit revision separately,
-bootstraps, enrolls, optionally prepares the consumer runtime, optionally validates commits, runs
-Sentinel once, and uploads complete evidence.
+Consumer CI belongs to the consumer. Git hooks do not run automatically in CI, and qa-toolkit
+does not expose a reusable workflow or remote action that enrolls a consumer during a run.
+Instead, mirror the accepted policy into a tracked repository-owned workflow using the
+consumer's native setup and commands. That workflow changes only through an ordinary reviewed
+consumer commit. A later QAT change has no effect on it.
 
-Use an exact 40-character qa-toolkit commit in both places:
+The useful behavior mapping is:
 
-```yaml
-jobs:
-  quality:
-    uses: OWNER/qa-toolkit/.github/workflows/reusable-sentinel.yml@0123456789abcdef0123456789abcdef01234567
-    with:
-      toolkit_revision: 0123456789abcdef0123456789abcdef01234567
-      base_sha: ${{ github.event.pull_request.base.sha }}
-      setup_path: scripts/prepare-qa
-      retention_days: 14
-```
+| Local QAT behavior | Repository-owned CI mirror |
+| --- | --- |
+| `commit-msg` / `qat commits` | Validate the PR or push commit range with the repository's chosen commit-policy command. |
+| `pre-commit` / `qat check` | Run the corresponding fast native lint, formatting, security, and source checks. |
+| `qat sentinel` | Keep the repository's authoritative test, coverage, packaging, and publication jobs. |
 
-`setup_path` is optional. It must be a tracked executable relative path and receives no
-interpolated arguments. Use it to create the consumer's virtual environment or perform other
-repository-owned runtime setup. `variant` selects a profile variant. `base_sha` enables commit
-validation for `BASE_SHA..HEAD`.
-
-For a private consumer using a private qa-toolkit repository, use the exact-revision composite
-action in `.github/actions/sentinel/action.yml`. GitHub's private-action delivery must be enabled
-for the consumer. Private reusable-workflow access alone does not grant the consumer token
-permission to clone another private repository. See [docs/foundation.md](docs/foundation.md) for
-the credential and checkout boundary.
+A mirror is behavioral, not a runtime dependency on QAT. Do not add a remote `uses:` reference to
+qa-toolkit, clone qa-toolkit, or enroll from qa-toolkit inside a consumer workflow. QAT's own
+workflow runs its checked-out local `bin/qat` because qa-toolkit is that workflow's repository.
 
 ## What qa-toolkit intentionally does not do
 
 - It does not support macOS, Windows, ARM, bare repositories, or linked worktree layouts whose
   `.git` is not a directory.
 - It does not install or update consumer dependencies, declarations, or lock files.
+- It does not install, clone, or execute qa-toolkit from consumer CI.
 - It does not rewrite consumer-owned native configuration during enroll or sync.
 - It does not provide one global ignore list or let a consumer silently remove central gates.
 - It does not auto-fix formatting or lint findings.
@@ -882,7 +877,6 @@ A gate printed only `[FINDING]` without its diagnostic output
 | `library/` | Hook entries, repository skills, retained instructions, and work templates. |
 | `bin/qat-*` | Small utilities with one primary operation. |
 | `src/qa_toolkit/` | Validation, deployment, runner, and command implementation. |
-| `docs/foundation.md` | Detailed ownership, safety, CI, and foundation record. |
 
 The `bin/qat` command is only a dispatcher to the small `bin/qat-*` utilities. Run
 `qat --help` for the complete family list and `qat <command> --help` for exact arguments.
